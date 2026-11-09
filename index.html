@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotless Spin Laundry POS - Bahrain Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @media print {
+            body > * { display: none !important; }
+            #print-container, #print-container * { display: block !important; visibility: visible !important; }
+            #print-container { position: absolute; left: 0; top: 0; width: 80mm; margin: 0; padding: 5px; background: white; font-family: monospace; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans h-[100dvh] flex flex-col overflow-hidden">
+
+    <div id="print-container" class="hidden"></div>
+
+    <!-- Header -->
+    <header class="bg-teal-700 text-white p-3 flex justify-between items-center shadow-md shrink-0">
+        <div class="flex items-center space-x-2">
+            <span class="font-bold text-lg">Spotless Spin Laundry POS</span>
+            <span class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-3 py-1.5 rounded transition font-semibold">Customer Accounts & Ledger</button>
+            <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-3 py-1.5 rounded transition font-semibold">All Active Tickets</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Left: Service Catalog -->
+        <div class="w-full md:w-3/5 p-4 flex flex-col h-full overflow-hidden">
+            <div class="mb-3">
+                <input type="text" id="search-input" onkeyup="filterServices()" placeholder="Search laundry service (e.g. Thobe, Abaya)..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+            </div>
+            <div id="service-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto no-scrollbar pb-16"></div>
+        </div>
+
+        <!-- Right: Current Ticket Cart & Partial Payment Setup -->
+        <div class="w-full md:w-2/5 bg-white border-l border-gray-200 flex flex-col h-full shadow-lg">
+            <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
+                <h2 class="font-bold text-gray-700 text-sm">New Laundry Ticket</h2>
+                <button onclick="clearCart()" class="text-xs text-red-600 font-medium">Clear All</button>
+            </div>
+
+            <!-- Customer Picker Box -->
+            <div class="p-3 bg-teal-50 border-b space-y-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-bold text-teal-800 uppercase">Customer Profile</label>
+                    <button onclick="openCustomerModal()" class="text-xs text-teal-700 font-bold hover:underline">Select / New</button>
+                </div>
+                <div id="active-customer-box" class="bg-white p-2 rounded border border-teal-200 flex justify-between items-center">
+                    <div>
+                        <p id="disp-cust-name" class="font-bold text-xs text-gray-800">Walk-in Customer</p>
+                        <p id="disp-cust-phone" class="text-[10px] text-gray-500">No phone attached</p>
+                    </div>
+                    <span id="disp-cust-balance" class="text-xs font-bold text-red-600">Due: BHD 0.000</span>
+                </div>
+            </div>
+
+            <!-- Cart Items List -->
+            <div id="cart-items" class="flex-1 overflow-y-auto p-3 space-y-2 divide-y divide-gray-100"></div>
+
+            <!-- Summary & Payment Footer -->
+            <div class="p-3 bg-gray-50 border-t space-y-2">
+                <div class="flex justify-between text-xs text-gray-600">
+                    <span>Total Pieces:</span>
+                    <span id="summary-pieces" class="font-bold">0 pcs</span>
+                </div>
+                <div class="flex justify-between text-sm font-bold text-gray-900">
+                    <span>Total Amount:</span>
+                    <span id="summary-total" class="text-teal-700">BHD 0.000</span>
+                </div>
+
+                <!-- Partial Advance Payment Input -->
+                <div class="bg-teal-50 p-2 rounded border border-teal-200 space-y-1">
+                    <label class="text-[10px] font-bold text-teal-800 uppercase block">Advance / Partial Payment (BHD)</label>
+                    <input type="number" id="advance-payment-input" step="0.001" value="0.000" class="w-full border rounded p-1 text-right font-bold text-sm bg-white outline-none focus:ring-1 focus:ring-teal-500">
+                </div>
+
+                <button onclick="checkoutOrder()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-lg shadow transition text-xs sm:text-sm">
+                    CREATE TICKET & PRINT RECEIPT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER SELECTOR MODAL -->
+    <div id="customer-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Select Customer</h3>
+                <button onclick="closeCustomerModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div id="cust-list" class="max-h-48 overflow-y-auto divide-y text-xs"></div>
+            <div class="border-t pt-2 space-y-2 bg-gray-50 p-2 rounded">
+                <h4 class="text-[10px] font-bold uppercase text-gray-700">Register New Customer</h4>
+                <input type="text" id="new-name" placeholder="Full Name *" class="w-full border rounded p-1.5 text-xs">
+                <input type="text" id="new-phone" placeholder="Mobile Number (e.g. 39xxxxxx) *" class="w-full border rounded p-1.5 text-xs">
+                <button onclick="createCustomer()" class="w-full bg-teal-600 text-white font-bold py-1.5 rounded text-xs">Save & Attach</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ALL ORDERS & PARTIAL PICKUP MODAL -->
+    <div id="orders-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Active Customer Tickets & Piece Tally</h3>
+                <button onclick="closeOrdersModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="text" id="order-search" onkeyup="renderOrdersList()" placeholder="Search by customer name, mobile or ticket #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div id="orders-list-container" class="flex-1 overflow-y-auto divide-y text-xs"></div>
+        </div>
+    </div>
+
+    <!-- PARTIAL PICKUP DIALOG MODAL -->
+    <div id="pickup-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-5 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Process Partial Pickup / Delivery</h3>
+                <button onclick="closePickupModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="hidden" id="pickup-order-id">
+            <div id="pickup-items-list" class="space-y-2 max-h-60 overflow-y-auto text-xs divide-y"></div>
+            <div class="border-t pt-2 space-y-2">
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-gray-600">Collect Remaining Balance Payment Now (BHD)</label>
+                    <input type="number" id="pickup-payment-add" step="0.001" value="0.000" class="w-full border rounded p-1.5 text-right font-bold text-sm">
+                </div>
+                <button onclick="confirmPartialPickup()" class="w-full bg-teal-600 text-white font-bold py-2 rounded text-xs">Confirm Pickup & Update Tally</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURED SUPABASE CREDENTIALS
+        const SUPABASE_URL = 'https://xzadxbvucxqsiogvfacm.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6YWR4dmJ1Y3hxc2lvZ3ZmYWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMjY3NDgsImV4cCI6MjEwOTgwMjc0OH0.jf1o535fzulqM5h1jyhNBjzzJcckLsF_Yp4EdVOFrOw';
+
+        let supabaseClient = null;
+        if (window.supabase) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let services = [];
+        let customers = [];
+        let activeOrders = [];
+        let selectedCustomer = null;
+        let cart = [];
+
+        const formatBHD = (amt) => 'BHD ' + (Math.round((amt || 0) * 1000) / 1000).toFixed(3);
+
+        window.onload = async () => {
+            await fetchServices();
+            await fetchCustomers();
+            await fetchOrders();
+        };
+
+        async function fetchServices() {
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('products').select('*').order('name');
+            if (data) services = data;
+            renderServices();
+        }
+
+        async function fetchCustomers() {
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('contacts').select('*').order('name');
+            if (data) customers = data;
+        }
+
+        async function fetchOrders() {
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('laundry_orders').select('*, order_items(*)').order('created_at', { ascending: false });
+            if (data) activeOrders = data;
+        }
+
+        function renderServices() {
+            const grid = document.getElementById('service-grid');
+            grid.innerHTML = '';
+            services.forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:border-teal-500 transition flex flex-col justify-between';
+                card.onclick = () => addToCart(s);
+                card.innerHTML = `
+                    <div>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">${s.category}</span>
+                        <h4 class="font-bold text-xs text-gray-800 mt-1">${s.name}</h4>
+                    </div>
+                    <div class="mt-2 pt-1 border-t flex justify-between items-center text-xs">
+                        <span class="font-black text-teal-700">${formatBHD(s.retail_price)}</span>
+                        <span class="text-teal-600 font-bold">+ Add</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterServices() {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            const grid = document.getElementById('service-grid');
+            grid.innerHTML = '';
+            services.filter(s => s.name.toLowerCase().includes(term) || s.category.toLowerCase().includes(term)).forEach(s => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-3 rounded-lg border border-gray-200 cursor-pointer';
+                card.onclick = () => addToCart(s);
+                card.innerHTML = `<h4 class="font-bold text-xs text-gray-800">${s.name}</h4><span class="text-xs font-black text-teal-700">${formatBHD(s.retail_price)}</span>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function addToCart(service) {
+            const existing = cart.find(i => i.id === service.id);
+            if (existing) existing.qty += 1;
+            else cart.push({ id: service.id, name: service.name, price: service.retail_price, qty: 1 });
+            updateCartUI();
+        }
+
+        function updateQty(id, delta) {
+            const item = cart.find(i => i.id === id);
+            if (!item) return;
+            item.qty = Math.max(1, item.qty + delta);
+            updateCartUI();
+        }
+
+        function clearCart() { cart = []; updateCartUI(); }
+
+        function updateCartUI() {
+            const container = document.getElementById('cart-items');
+            container.innerHTML = '';
+            let total = 0;
+            let totalPieces = 0;
+
+            cart.forEach(item => {
+                const lineTotal = item.price * item.qty;
+                total += lineTotal;
+                totalPieces += item.qty;
+
+                const div = document.createElement('div');
+                div.className = 'py-2 flex justify-between items-center text-xs';
+                div.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-gray-800">${item.name}</p>
+                        <p class="text-gray-400 text-[10px]">${formatBHD(item.price)} per pc</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-center border rounded">
+                            <button onclick="updateQty('${item.id}', -1)" class="px-2 bg-gray-100">-</button>
+                            <span class="px-2 font-bold">${item.qty}</span>
+                            <button onclick="updateQty('${item.id}', 1)" class="px-2 bg-gray-100">+</button>
+                        </div>
+                        <span class="font-bold w-14 text-right">${formatBHD(lineTotal)}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            document.getElementById('summary-pieces').innerText = totalPieces + ' pcs';
+            document.getElementById('summary-total').innerText = formatBHD(total);
+            document.getElementById('advance-payment-input').value = total.toFixed(3);
+        }
+
+        function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); renderCustomerList(); }
+        function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
+
+        function renderCustomerList() {
+            const term = document.getElementById('cust-search').value.toLowerCase();
+            const container = document.getElementById('cust-list');
+            container.innerHTML = '';
+            customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term)).forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'p-2 hover:bg-teal-50 cursor-pointer flex justify-between items-center';
+                div.onclick = () => { selectCustomer(c); closeCustomerModal(); };
+                div.innerHTML = `<div><strong>${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
+                container.appendChild(div);
+            });
+        }
+
+        function selectCustomer(c) {
+            selectedCustomer = c;
+            document.getElementById('disp-cust-name').innerText = c.name;
+            document.getElementById('disp-cust-phone').innerText = c.phone;
+            document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(c.outstanding_balance);
+        }
+
+        async function createCustomer() {
+            const name = document.getElementById('new-name').value.trim();
+            const phone = document.getElementById('new-phone').value.trim();
+            if (!name || !phone) return alert('Enter name and mobile');
+            if (supabaseClient) {
+                const { data } = await supabaseClient.from('contacts').insert([{ name, phone }]).select();
+                if (data && data[0]) {
+                    customers.push(data[0]);
+                    selectCustomer(data[0]);
+                    closeCustomerModal();
+                }
+            }
+        }
+
+        async function checkoutOrder() {
+            if (cart.length === 0) return alert('Ticket is empty');
+            const total = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            const advancePaid = parseFloat(document.getElementById('advance-payment-input').value) || 0;
+            const balanceDue = Math.max(0, total - advancePaid);
+            const custName = selectedCustomer ? selectedCustomer.name : 'Walk-in Customer';
+            const custPhone = selectedCustomer ? selectedCustomer.phone : 'N/A';
+            const payStatus = advancePaid >= total ? 'PAID' : (advancePaid > 0 ? 'PARTIAL' : 'PENDING');
+
+            let newOrderId = null;
+            if (supabaseClient) {
+                const { data: orderData, error } = await supabaseClient.from('laundry_orders').insert([{
+                    customer_id: selectedCustomer ? selectedCustomer.id : null,
+                    customer_name: custName,
+                    customer_phone: custPhone,
+                    total_amount: total,
+                    paid_amount: advancePaid,
+                    balance_due: balanceDue,
+                    payment_status: payStatus,
+                    order_status: 'OPEN'
+                }]).select().single();
+
+                if (error) return alert('Error creating ticket: ' + error.message);
+                newOrderId = orderData.id;
+
+                const itemsPayload = cart.map(i => ({
+                    order_id: newOrderId,
+                    product_id: i.id,
+                    item_name: i.name,
+                    unit_price: i.price,
+                    quantity: i.qty,
+                    picked_up_quantity: 0,
+                    total_price: i.price * i.qty
+                }));
+                await supabaseClient.from('order_items').insert(itemsPayload);
+
+                if (advancePaid > 0) {
+                    await supabaseClient.from('order_payments').insert([{ order_id: newOrderId, amount_paid: advancePaid }]);
+                }
+            }
+
+            alert('Laundry Ticket Created Successfully!');
+            clearCart();
+            await fetchOrders();
+        }
+
+        function openOrdersModal() { document.getElementById('orders-modal').classList.remove('hidden'); renderOrdersList(); }
+        function closeOrdersModal() { document.getElementById('orders-modal').classList.add('hidden'); }
+
+        function renderOrdersList() {
+            const term = document.getElementById('order-search').value.toLowerCase();
+            const container = document.getElementById('orders-list-container');
+            container.innerHTML = '';
+
+            activeOrders.filter(o => o.customer_name.toLowerCase().includes(term) || o.customer_phone.includes(term) || String(o.ticket_number).includes(term)).forEach(o => {
+                const div = document.createElement('div');
+                div.className = 'py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
+                
+                let itemsSummary = (o.order_items || []).map(i => `${i.quantity - i.picked_up_quantity} / ${i.quantity} ${i.item_name} pending`).join('<br>');
+
+                div.innerHTML = `
+                    <div>
+                        <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name} (${o.customer_phone})<br>
+                        <span class="text-gray-500 text-[10px]">Status: ${o.order_status} | Payment: ${o.payment_status}</span><br>
+                        <div class="text-teal-700 font-medium text-[11px] mt-1">${itemsSummary}</div>
+                    </div>
+                    <div class="text-right space-y-1">
+                        <div>Total: ${formatBHD(o.total_amount)} | <span class="text-red-600 font-bold">Due: ${formatBHD(o.balance_due)}</span></div>
+                        <div class="space-x-1">
+                            <button onclick="openPickupModal('${o.id}')" class="bg-teal-600 text-white px-2 py-1 rounded font-bold">Partial Pickup</button>
+                            <button onclick="printReceipt('${o.id}')" class="bg-gray-800 text-white px-2 py-1 rounded">Print</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        let currentPickupOrder = null;
+        function openPickupModal(orderId) {
+            currentPickupOrder = activeOrders.find(o => o.id === orderId);
+            if (!currentPickupOrder) return;
+            document.getElementById('pickup-order-id').value = orderId;
+            document.getElementById('pickup-payment-add').value = currentPickupOrder.balance_due.toFixed(3);
+
+            const container = document.getElementById('pickup-items-list');
+            container.innerHTML = '';
+            (currentPickupOrder.order_items || []).forEach((item, idx) => {
+                const remaining = item.quantity - item.picked_up_quantity;
+                const row = document.createElement('div');
+                row.className = 'py-1.5 flex justify-between items-center';
+                row.innerHTML = `
+                    <span>${item.item_name} (Total: ${item.quantity}, Already Taken: ${item.picked_up_quantity})</span>
+                    <div class="flex items-center space-x-1">
+                        <span class="text-xs">Take Now:</span>
+                        <input type="number" id="pickup-qty-${idx}" min="0" max="${remaining}" value="0" class="w-16 border rounded p-1 text-center font-bold">
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+            document.getElementById('pickup-modal').classList.remove('hidden');
+        }
+        function closePickupModal() { document.getElementById('pickup-modal').classList.add('hidden'); }
+
+        async function confirmPartialPickup() {
+            const orderId = document.getElementById('pickup-order-id').value;
+            const additionalPayment = parseFloat(document.getElementById('pickup-payment-add').value) || 0;
+            
+            let allItemsPickedUp = true;
+            let updatedItems = [...currentPickupOrder.order_items];
+
+            updatedItems.forEach((item, idx) => {
+                const takeQty = parseInt(document.getElementById(`pickup-qty-${idx}`).value) || 0;
+                item.picked_up_quantity = Math.min(item.quantity, item.picked_up_quantity + takeQty);
+                if (item.picked_up_quantity < item.quantity) allItemsPickedUp = false;
+            });
+
+            const newPaid = currentPickupOrder.paid_amount + additionalPayment;
+            const newBalanceDue = Math.max(0, currentPickupOrder.total_amount - newPaid);
+            const newOrderStatus = allItemsPickedUp ? 'COMPLETED' : 'PARTIALLY_PICKED';
+            const newPayStatus = newBalanceDue === 0 ? 'PAID' : (newPaid > 0 ? 'PARTIAL' : 'PENDING');
+
+            if (supabaseClient) {
+                for (let item of updatedItems) {
+                    await supabaseClient.from('order_items').update({ picked_up_quantity: item.picked_up_quantity }).eq('id', item.id);
+                }
+                await supabaseClient.from('laundry_orders').update({
+                    paid_amount: newPaid,
+                    balance_due: newBalanceDue,
+                    order_status: newOrderStatus,
+                    payment_status: newPayStatus
+                }).eq('id', orderId);
+
+                if (additionalPayment > 0) {
+                    await supabaseClient.from('order_payments').insert([{ order_id: orderId, amount_paid: additionalPayment }]);
+                }
+            }
+
+            alert('Pickup tally updated successfully!');
+            closePickupModal();
+            await fetchOrders();
+            openOrdersModal();
+        }
+
+        function printReceipt(orderId) {
+            const order = activeOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const printContainer = document.getElementById('print-container');
+            printContainer.innerHTML = `
+                <div style="text-align: center;">
+                    <h3 style="margin:0; font-size: 14px;">SPOTLESS SPIN LAUNDRY</h3>
+                    <p style="margin:2px 0; font-size: 10px;">Kingdom of Bahrain</p>
+                </div>
+                <hr style="border: dashed 1px black; margin: 4px 0;">
+                <div style="font-size: 10px;">
+                    <div><strong>Ticket #:</strong> ${order.ticket_number}</div>
+                    <div><strong>Customer:</strong> ${order.customer_name}</div>
+                    <div><strong>Mobile:</strong> ${order.customer_phone}</div>
+                    <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+                </div>
+                <hr style="border: dashed 1px black; margin: 4px 0;">
+                <table style="width:100%; font-size: 10px;">
+                    <tr style="border-bottom: 1px solid black;">
+                        <th style="text-align:left;">Item</th>
+                        <th style="text-align:center;">Total</th>
+                        <th style="text-align:center;">Picked</th>
+                        <th style="text-align:right;">Price</th>
+                    </tr>
+                    ${(order.order_items || []).map(i => `
+                        <tr>
+                            <td>${i.item_name}</td>
+                            <td style="text-align:center;">${i.quantity}</td>
+                            <td style="text-align:center;">${i.picked_up_quantity}</td>
+                            <td style="text-align:right;">${formatBHD(i.total_price)}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+                <hr style="border: dashed 1px black; margin: 4px 0;">
+                <div style="font-size: 10px; display:flex; flex-direction:column; gap:2px;">
+                    <div style="display:flex; justify-content:space-between;"><span>Total Amount:</span><span>${formatBHD(order.total_amount)}</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>Paid Advance:</span><span>${formatBHD(order.paid_amount)}</span></div>
+                    <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Balance Due:</span><span>${formatBHD(order.balance_due)}</span></div>
+                </div>
+                <hr style="border: dashed 1px black; margin: 4px 0;">
+                <div style="text-align: center; font-size: 9px;">
+                    <p>Thank you for choosing Spotless Spin!</p>
+                </div>
+            `;
+            printContainer.classList.remove('hidden');
+            window.print();
+            printContainer.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
