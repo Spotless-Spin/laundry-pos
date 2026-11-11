@@ -47,20 +47,20 @@
         <!-- Right: Current Ticket Cart -->
         <div class="w-full md:w-2/5 bg-white border-l border-gray-200 flex flex-col h-full shadow-lg">
             <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
-                <h2 class="font-bold text-gray-700 text-sm">New Laundry Ticket</h2>
+                <h2 class="font-bold text-gray-700 text-sm">New Ticket</h2>
                 <button onclick="clearCart()" class="text-xs text-red-600 font-medium">Clear All</button>
             </div>
 
             <!-- Customer Picker Box -->
             <div class="p-3 bg-teal-50 border-b space-y-2">
                 <div class="flex justify-between items-center">
-                    <label class="text-[10px] font-bold text-teal-800 uppercase">Customer Profile (Mandatory)</label>
+                    <label class="text-[10px] font-bold text-teal-800 uppercase">Customer (Mandatory)</label>
                     <button onclick="openCustomerModal()" class="text-xs text-teal-700 font-bold hover:underline">Select / New</button>
                 </div>
                 <div id="active-customer-box" class="bg-white p-2 rounded border border-teal-200 flex justify-between items-center">
                     <div>
                         <p id="disp-cust-name" class="font-bold text-xs text-red-600">No customer selected *</p>
-                        <p id="disp-cust-phone" class="text-[10px] text-gray-500">Please select a customer first</p>
+                        <p id="disp-cust-phone" class="text-[10px] text-gray-500">Please select a customer</p>
                     </div>
                     <span id="disp-cust-balance" class="text-xs font-bold text-gray-400">Due: BHD 0.000</span>
                 </div>
@@ -170,13 +170,13 @@
 
     <!-- CUSTOMER MANAGER MODAL -->
     <div id="customer-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800">Customer Accounts & Outstanding Ledger</h3>
+                <h3 class="font-bold text-sm text-gray-800">Customer Accounts, Ledger & Order History</h3>
                 <button onclick="closeCustomerManager()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="manager-cust-search" onkeyup="renderCustomerManagerList()" placeholder="Search customer ledger..." class="w-full border rounded px-3 py-2 text-xs outline-none">
-            <div id="customer-manager-list" class="flex-1 overflow-y-auto divide-y text-xs"></div>
+            <input type="text" id="manager-cust-search" onkeyup="renderCustomerManagerList()" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div id="customer-manager-list" class="flex-1 overflow-y-auto divide-y text-xs space-y-3"></div>
         </div>
     </div>
 
@@ -354,29 +354,76 @@
             document.getElementById('summary-total').innerText = formatBHD(total);
         }
 
-        function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); renderCustomerList(); }
+        async function openCustomerModal() { 
+            await fetchCustomers();
+            document.getElementById('customer-modal').classList.remove('hidden'); 
+            renderCustomerList(); 
+        }
         function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
 
-        function openCustomerManager() { document.getElementById('customer-manager-modal').classList.remove('hidden'); renderCustomerManagerList(); }
+        async function openCustomerManager() { 
+            await fetchCustomers();
+            await fetchOrders();
+            document.getElementById('customer-manager-modal').classList.remove('hidden'); 
+            renderCustomerManagerList(); 
+        }
         function closeCustomerManager() { document.getElementById('customer-manager-modal').classList.add('hidden'); }
 
         function renderCustomerManagerList() {
             const term = document.getElementById('manager-cust-search').value.toLowerCase();
             const container = document.getElementById('customer-manager-list');
             container.innerHTML = '';
-            customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term)).forEach(c => {
+            
+            const filtered = customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term));
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-4">No customers found.</p>';
+                return;
+            }
+
+            filtered.forEach(c => {
+                const custOrders = activeOrders.filter(o => o.customer_id === c.id);
                 const div = document.createElement('div');
-                div.className = 'py-2 flex justify-between items-center';
-                div.innerHTML = `<div><strong>${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">Outstanding: ${formatBHD(c.outstanding_balance)}</span>`;
+                div.className = 'p-3 bg-gray-50 rounded border border-gray-200 space-y-2';
+                
+                let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
+                    <div class="flex justify-between items-center text-[11px] bg-white p-1.5 rounded border border-gray-100">
+                        <span>Ticket #${o.ticket_number} (${new Date(o.created_at).toLocaleDateString()}) - Status: <strong>${o.order_status}</strong></span>
+                        <span>Total: ${formatBHD(o.total_amount)} | <strong class="text-red-600">Due: ${formatBHD(o.balance_due)}</strong></span>
+                    </div>
+                `).join('') : '<p class="text-gray-400 text-[11px]">No orders recorded for this customer yet.</p>';
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <strong class="text-sm text-teal-800">${c.name}</strong><br>
+                            <span class="text-gray-500 text-xs">Mobile: ${c.phone} | Total Spent: ${formatBHD(c.total_spent)}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-red-600">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                        <p class="text-[10px] font-bold text-gray-700 uppercase">Customer Orders / Tickets:</p>
+                        ${ordersHtml}
+                    </div>
+                `;
                 container.appendChild(div);
             });
         }
 
-        function renderCustomerList() {
+        async function renderCustomerList() {
+            await fetchCustomers();
             const term = document.getElementById('cust-search').value.toLowerCase();
             const container = document.getElementById('cust-list');
             container.innerHTML = '';
-            customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term)).forEach(c => {
+            
+            const filtered = customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term));
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="p-3 text-gray-400 text-xs text-center">No customers found. Register a new customer below.</div>';
+                return;
+            }
+
+            filtered.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-teal-50 cursor-pointer flex justify-between items-center';
                 div.onclick = () => { selectCustomer(c); closeCustomerModal(); };
@@ -411,7 +458,6 @@
             }
         }
 
-        // --- REQUIREMENT 3 & 4: MANDATORY CUSTOMER & ADVANCE PAYMENT PROMPT ---
         function promptCheckout() {
             if (cart.length === 0) return alert('Ticket is empty');
             if (!selectedCustomer) {
@@ -490,7 +536,6 @@
             await fetchOrders();
         }
 
-        // --- REQUIREMENT 1: PRODUCT & PRICE MANAGER ---
         function openProductManager() {
             document.getElementById('product-manager-modal').classList.remove('hidden');
             renderProductManagerList();
@@ -530,7 +575,6 @@
             }
         }
 
-        // --- REQUIREMENT 2: VIEW SALES WINDOW ---
         function openSalesModal() {
             document.getElementById('sales-modal').classList.remove('hidden');
             renderSalesSummary();
