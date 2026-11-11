@@ -26,15 +26,15 @@
             <span class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
         </div>
         <div class="flex items-center space-x-2 flex-wrap gap-1">
-            <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
+            <button onclick="openCustomerLedgerPage()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
             <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">All Active Tickets</button>
             <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
             <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
         </div>
     </header>
 
-    <!-- Main Workspace -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+    <!-- Main Workspace (POS View) -->
+    <div id="pos-workspace" class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
         <!-- Left: Service Catalog -->
         <div class="w-full md:w-3/5 p-4 flex flex-col h-full overflow-hidden">
@@ -84,6 +84,21 @@
                     CREATE TICKET & PRINT RECEIPT
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Customer Ledger Full Page View (Hidden by default) -->
+    <div id="ledger-workspace" class="flex-1 flex flex-col p-6 overflow-y-auto hidden bg-gray-50">
+        <div class="max-w-4xl w-full mx-auto space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div>
+                    <h2 class="font-bold text-lg text-gray-800">Customer Accounts & Outstanding Ledger</h2>
+                    <p class="text-xs text-gray-500">View customer profiles, contact info, total spending, and individual order history.</p>
+                </div>
+                <button onclick="backToPOS()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-xs font-bold shadow">Back to POS</button>
+            </div>
+            <input type="text" id="ledger-page-search" onkeyup="renderCustomerLedgerPageList()" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none bg-white shadow-sm">
+            <div id="ledger-page-list" class="space-y-3"></div>
         </div>
     </div>
 
@@ -165,18 +180,6 @@
                 <input type="text" id="new-phone" placeholder="Mobile Number (e.g. 39xxxxxx) *" class="w-full border rounded p-1.5 text-xs">
                 <button onclick="createCustomer()" class="w-full bg-teal-600 text-white font-bold py-1.5 rounded text-xs">Save & Attach</button>
             </div>
-        </div>
-    </div>
-
-    <!-- CUSTOMER MANAGER MODAL -->
-    <div id="customer-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800">Customer Accounts, Ledger & Order History</h3>
-                <button onclick="closeCustomerManager()" class="text-gray-400 font-bold">&times;</button>
-            </div>
-            <input type="text" id="manager-cust-search" onkeyup="renderCustomerManagerList()" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
-            <div id="customer-manager-list" class="flex-1 overflow-y-auto divide-y text-xs space-y-3"></div>
         </div>
     </div>
 
@@ -318,7 +321,17 @@
             updateCartUI();
         }
 
-        function clearCart() { cart = []; updateCartUI(); }
+        // --- REQUIREMENT 1: CLEAR ALL CART & CUSTOMER NAME ---
+        function clearCart() { 
+            cart = []; 
+            selectedCustomer = null;
+            document.getElementById('disp-cust-name.className') = 'font-bold text-xs text-red-600';
+            document.getElementById('disp-cust-name').innerText = 'No customer selected *';
+            document.getElementById('disp-cust-phone').innerText = 'Please select a customer';
+            document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-gray-400';
+            document.getElementById('disp-cust-balance').innerText = 'Due: BHD 0.000';
+            updateCartUI(); 
+        }
 
         function updateCartUI() {
             const container = document.getElementById('cart-items');
@@ -354,43 +367,45 @@
             document.getElementById('summary-total').innerText = formatBHD(total);
         }
 
-        async function openCustomerModal() { 
-            await fetchCustomers();
-            document.getElementById('customer-modal').classList.remove('hidden'); 
-            renderCustomerList(); 
-        }
+        function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); renderCustomerList(); }
         function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
 
-        async function openCustomerManager() { 
+        // --- REQUIREMENT 2: CUSTOMER LEDGER OPENS AS A NEW PAGE VIEW ---
+        async function openCustomerLedgerPage() {
             await fetchCustomers();
             await fetchOrders();
-            document.getElementById('customer-manager-modal').classList.remove('hidden'); 
-            renderCustomerManagerList(); 
+            document.getElementById('pos-workspace').classList.add('hidden');
+            document.getElementById('ledger-workspace').classList.remove('hidden');
+            renderCustomerLedgerPageList();
         }
-        function closeCustomerManager() { document.getElementById('customer-manager-modal').classList.add('hidden'); }
 
-        function renderCustomerManagerList() {
-            const term = document.getElementById('manager-cust-search').value.toLowerCase();
-            const container = document.getElementById('customer-manager-list');
+        function backToPOS() {
+            document.getElementById('ledger-workspace').classList.add('hidden');
+            document.getElementById('pos-workspace').classList.remove('hidden');
+        }
+
+        function renderCustomerLedgerPageList() {
+            const term = document.getElementById('ledger-page-search').value.toLowerCase();
+            const container = document.getElementById('ledger-page-list');
             container.innerHTML = '';
             
             const filtered = customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term));
             if (filtered.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-4">No customers found.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-4 bg-white rounded border">No customers found.</p>';
                 return;
             }
 
             filtered.forEach(c => {
                 const custOrders = activeOrders.filter(o => o.customer_id === c.id);
                 const div = document.createElement('div');
-                div.className = 'p-3 bg-gray-50 rounded border border-gray-200 space-y-2';
+                div.className = 'p-4 bg-white rounded-lg border border-gray-200 shadow-sm space-y-3';
                 
                 let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
-                    <div class="flex justify-between items-center text-[11px] bg-white p-1.5 rounded border border-gray-100">
+                    <div class="flex justify-between items-center text-xs bg-gray-50 p-2 rounded border border-gray-100">
                         <span>Ticket #${o.ticket_number} (${new Date(o.created_at).toLocaleDateString()}) - Status: <strong>${o.order_status}</strong></span>
                         <span>Total: ${formatBHD(o.total_amount)} | <strong class="text-red-600">Due: ${formatBHD(o.balance_due)}</strong></span>
                     </div>
-                `).join('') : '<p class="text-gray-400 text-[11px]">No orders recorded for this customer yet.</p>';
+                `).join('') : '<p class="text-gray-400 text-xs">No orders recorded for this customer yet.</p>';
 
                 div.innerHTML = `
                     <div class="flex justify-between items-start">
@@ -402,8 +417,8 @@
                             <span class="text-xs font-bold text-red-600">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
                         </div>
                     </div>
-                    <div class="mt-2 pt-2 border-t border-gray-200 space-y-1">
-                        <p class="text-[10px] font-bold text-gray-700 uppercase">Customer Orders / Tickets:</p>
+                    <div class="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
+                        <p class="text-[11px] font-bold text-gray-700 uppercase">Customer Orders / Tickets:</p>
                         ${ordersHtml}
                     </div>
                 `;
@@ -771,6 +786,7 @@
                     <p>Thank you for choosing Spotless Spin!</p>
                 </div>
             `;
+            printContainer.classList.add('hidden'); // ensure hidden initially
             printContainer.classList.remove('hidden');
             window.print();
             printContainer.classList.add('hidden');
