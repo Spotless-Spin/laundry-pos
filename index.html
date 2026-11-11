@@ -20,11 +20,28 @@
 
     <div id="print-container" class="hidden"></div>
 
+    <!-- PIN LOGIN MODAL (MANDATORY ON STARTUP) -->
+    <div id="pin-login-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-5 text-center">
+            <div>
+                <h2 class="text-lg font-bold text-teal-800">Spotless Spin Laundry W.L.L.</h2>
+                <p class="text-xs text-gray-500 mt-1">Please enter your PIN code to continue</p>
+            </div>
+            <div>
+                <input type="password" id="pin-input" maxlength="10" placeholder="Enter PIN code..." class="w-full border-2 rounded-xl p-3 text-center text-lg font-black tracking-widest outline-none focus:border-teal-600 bg-gray-50" onkeydown="if(event.key==='Enter') verifyPinCode()">
+            </div>
+            <button onclick="verifyPinCode()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl shadow transition text-sm">
+                Login / Authenticate
+            </button>
+            <p id="pin-error-msg" class="text-xs text-red-600 font-semibold hidden">Invalid PIN code. Please try again (e.g., Admin: 4321, Cashier: 1122).</p>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-teal-700 text-white p-3 flex justify-between items-center shadow-md shrink-0">
         <div class="flex items-center space-x-2">
             <span class="font-bold text-lg">Spotless Spin Laundry W.L.L.</span>
-            <span class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
+            <span id="user-role-badge" class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
         </div>
         <div class="flex items-center space-x-2 flex-wrap gap-1">
             <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
@@ -32,6 +49,7 @@
             <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
             <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
             <button onclick="openAdminDashboard()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Admin Dashboard</button>
+            <button onclick="logoutSession()" class="bg-red-700 hover:bg-red-800 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Logout</button>
         </div>
     </header>
 
@@ -405,6 +423,8 @@
         let customers = [];
         let activeOrders = [];
         let orderPaymentsList = [];
+        let posUsersList = [];
+        let currentUser = null; // { name, role }
         let selectedCustomer = null;
         let cart = [];
 
@@ -417,11 +437,67 @@
         const formatBHD = (amt) => 'BHD ' + (Math.round((amt || 0) * 1000) / 1000).toFixed(3);
 
         window.onload = async () => {
+            await fetchUsers();
             await fetchServices();
             await fetchCustomers();
             await fetchOrders();
             await fetchPayments();
         };
+
+        async function fetchUsers() {
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('pos_users').select('*');
+            if (data && data.length > 0) {
+                posUsersList = data;
+            } else {
+                // Fallback default users if table is empty
+                posUsersList = [
+                    { name: 'OWNER', pin_code: '4321', role: 'ADMIN' },
+                    { name: 'ATTENDANT', pin_code: '1122', role: 'CASHIER' }
+                ];
+            }
+        }
+
+        async function verifyPinCode() {
+            const pin = document.getElementById('pin-input').value.trim();
+            const errEl = document.getElementById('pin-error-msg');
+            
+            // Check against fetched posUsersList
+            const foundUser = posUsersList.find(u => u.pin_code === pin);
+            if (foundUser) {
+                currentUser = { name: foundUser.name, role: foundUser.role };
+                errEl.classList.add('hidden');
+                document.getElementById('pin-input').value = '';
+                document.getElementById('pin-login-modal').classList.add('hidden');
+                applyUserPrivileges();
+            } else {
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        function logoutSession() {
+            currentUser = null;
+            document.getElementById('pin-input').value = '';
+            document.getElementById('pin-error-msg').classList.add('hidden');
+            document.getElementById('pin-login-modal').classList.remove('hidden');
+            // Reset views
+            document.getElementById('customer-ledger-view').classList.add('hidden');
+            document.getElementById('admin-dashboard-view').classList.add('hidden');
+            document.getElementById('pos-view').classList.remove('hidden');
+        }
+
+        function applyUserPrivileges() {
+            const roleBadge = document.getElementById('user-role-badge');
+            const adminDashboardBtn = document.querySelector('button[onclick="openAdminDashboard()"]');
+            
+            if (currentUser && currentUser.role === 'ADMIN') {
+                roleBadge.innerText = `${currentUser.name} (Admin)`;
+                if (adminDashboardBtn) adminDashboardBtn.classList.remove('hidden');
+            } else {
+                roleBadge.innerText = `${currentUser ? currentUser.name : 'Cashier'} (Cashier)`;
+                if (adminDashboardBtn) adminDashboardBtn.classList.add('hidden');
+            }
+        }
 
         async function fetchServices() {
             if (!supabaseClient) return;
@@ -597,6 +673,8 @@
                 return;
             }
 
+            const isAdmin = currentUser && currentUser.role === 'ADMIN';
+
             filtered.forEach(c => {
                 const custOrders = activeOrders.filter(o => o.customer_id === c.id);
                 let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
@@ -611,6 +689,8 @@
 
                 const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
 
+                const editBtnHtml = isAdmin ? `<button onclick="openCustomerEditModal('${c.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow">Edit Customer</button>` : '';
+
                 const card = document.createElement('div');
                 card.className = 'bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3';
                 card.innerHTML = `
@@ -621,7 +701,7 @@
                         </div>
                         <div class="flex items-center space-x-3">
                             <span class="text-sm font-bold text-red-600">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
-                            <button onclick="openCustomerEditModal('${c.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow">Edit Customer</button>
+                            ${editBtnHtml}
                         </div>
                     </div>
                     <div>
@@ -650,6 +730,9 @@
 
         // CUSTOMER EDIT MODAL (ADMIN)
         function openCustomerEditModal(customerId) {
+            if (!currentUser || currentUser.role !== 'ADMIN') {
+                return alert('Access Denied: Only Admin can edit customer details.');
+            }
             const cust = customers.find(c => c.id === customerId);
             if (!cust) return;
             document.getElementById('edit-cust-id').value = cust.id;
@@ -662,6 +745,9 @@
             document.getElementById('customer-edit-modal').classList.add('hidden');
         }
         async function saveCustomerDetails() {
+            if (!currentUser || currentUser.role !== 'ADMIN') {
+                return alert('Access Denied.');
+            }
             const id = document.getElementById('edit-cust-id').value;
             const name = document.getElementById('edit-cust-name').value.trim();
             const phone = document.getElementById('edit-cust-phone').value.trim();
@@ -819,6 +905,9 @@
 
         // PRODUCT MANAGER (ADMIN: ADD, EDIT, DELETE)
         function openProductManager() {
+            if (!currentUser || currentUser.role !== 'ADMIN') {
+                return alert('Access Denied: Only Admin can manage products.');
+            }
             document.getElementById('product-manager-modal').classList.remove('hidden');
             renderProductManagerList();
         }
@@ -856,6 +945,9 @@
         }
 
         function openProductEditModal(productId) {
+            if (!currentUser || currentUser.role !== 'ADMIN') {
+                return alert('Access Denied.');
+            }
             document.getElementById('product-edit-modal').classList.remove('hidden');
             if (!productId) {
                 document.getElementById('prod-edit-modal-title').innerText = 'Add New Product';
@@ -881,6 +973,7 @@
         }
 
         async function saveProductDetails() {
+            if (!currentUser || currentUser.role !== 'ADMIN') return alert('Access Denied.');
             const id = document.getElementById('edit-prod-id').value;
             const sku = document.getElementById('edit-prod-sku').value.trim();
             const name = document.getElementById('edit-prod-name').value.trim();
@@ -908,6 +1001,7 @@
         }
 
         async function deleteProduct(productId) {
+            if (!currentUser || currentUser.role !== 'ADMIN') return alert('Access Denied.');
             if (!confirm('Are you sure you want to delete this product?')) return;
             if (supabaseClient) {
                 const { error } = await supabaseClient.from('products').delete().eq('id', productId);
@@ -961,6 +1055,9 @@
 
         // ADMIN ANALYTICS DASHBOARD WITH CHARTS & DATE RANGE
         async function openAdminDashboard() {
+            if (!currentUser || currentUser.role !== 'ADMIN') {
+                return alert('Access Denied: Only Admin can access the Admin Dashboard.');
+            }
             await fetchOrders();
             await fetchPayments();
             document.getElementById('pos-view').classList.add('hidden');
@@ -999,6 +1096,7 @@
         }
 
         async function renderAdminDashboard() {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
             await fetchOrders();
             await fetchPayments();
 
