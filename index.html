@@ -25,9 +25,11 @@
             <span class="font-bold text-lg">Spotless Spin Laundry W.L.L.</span>
             <span class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
         </div>
-        <div class="flex items-center space-x-2">
-            <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-3 py-1.5 rounded transition font-semibold">Customer Ledger</button>
-            <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-3 py-1.5 rounded transition font-semibold">All Active Tickets</button>
+        <div class="flex items-center space-x-2 flex-wrap gap-1">
+            <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
+            <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">All Active Tickets</button>
+            <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
+            <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
         </div>
     </header>
 
@@ -42,7 +44,7 @@
             <div id="service-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto no-scrollbar pb-16"></div>
         </div>
 
-        <!-- Right: Current Ticket Cart & Partial Payment Setup -->
+        <!-- Right: Current Ticket Cart -->
         <div class="w-full md:w-2/5 bg-white border-l border-gray-200 flex flex-col h-full shadow-lg">
             <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
                 <h2 class="font-bold text-gray-700 text-sm">New Laundry Ticket</h2>
@@ -52,15 +54,15 @@
             <!-- Customer Picker Box -->
             <div class="p-3 bg-teal-50 border-b space-y-2">
                 <div class="flex justify-between items-center">
-                    <label class="text-[10px] font-bold text-teal-800 uppercase">Customer Profile</label>
+                    <label class="text-[10px] font-bold text-teal-800 uppercase">Customer Profile (Mandatory)</label>
                     <button onclick="openCustomerModal()" class="text-xs text-teal-700 font-bold hover:underline">Select / New</button>
                 </div>
                 <div id="active-customer-box" class="bg-white p-2 rounded border border-teal-200 flex justify-between items-center">
                     <div>
-                        <p id="disp-cust-name" class="font-bold text-xs text-gray-800">Walk-in Customer</p>
-                        <p id="disp-cust-phone" class="text-[10px] text-gray-500">No phone attached</p>
+                        <p id="disp-cust-name" class="font-bold text-xs text-red-600">No customer selected *</p>
+                        <p id="disp-cust-phone" class="text-[10px] text-gray-500">Please select a customer first</p>
                     </div>
-                    <span id="disp-cust-balance" class="text-xs font-bold text-red-600">Due: BHD 0.000</span>
+                    <span id="disp-cust-balance" class="text-xs font-bold text-gray-400">Due: BHD 0.000</span>
                 </div>
             </div>
 
@@ -78,16 +80,73 @@
                     <span id="summary-total" class="text-teal-700">BHD 0.000</span>
                 </div>
 
-                <!-- Partial Advance Payment Input -->
-                <div class="bg-teal-50 p-2 rounded border border-teal-200 space-y-1">
-                    <label class="text-[10px] font-bold text-teal-800 uppercase block">Advance / Partial Payment (BHD)</label>
-                    <input type="number" id="advance-payment-input" step="0.001" value="0.000" class="w-full border rounded p-1 text-right font-bold text-sm bg-white outline-none focus:ring-1 focus:ring-teal-500">
-                </div>
-
-                <button onclick="checkoutOrder()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-lg shadow transition text-xs sm:text-sm">
+                <button onclick="promptCheckout()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-lg shadow transition text-xs sm:text-sm">
                     CREATE TICKET & PRINT RECEIPT
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ADVANCE PAYMENT PROMPT MODAL -->
+    <div id="advance-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Advance Payment Details</h3>
+                <button onclick="closeAdvanceModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <p class="text-gray-600">Has any advance payment been made for this ticket?</p>
+                <div class="flex justify-between font-bold text-gray-800">
+                    <span>Total Ticket Amount:</span>
+                    <span id="adv-modal-total" class="text-teal-700">BHD 0.000</span>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Advance Amount Paid (BHD)</label>
+                    <input type="number" id="modal-advance-input" step="0.001" value="0.000" class="w-full border rounded p-2 text-right font-bold text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeAdvanceModal()" class="w-1/2 bg-gray-200 text-gray-700 font-bold py-2 rounded text-xs">Cancel</button>
+                <button onclick="confirmCheckoutOrder()" class="w-1/2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs">Proceed & Print</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRODUCT MANAGER MODAL -->
+    <div id="product-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Manage Products & Retail Prices</h3>
+                <button onclick="closeProductManager()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="text" id="prod-mgr-search" onkeyup="renderProductManagerList()" placeholder="Search products by name, SKU or category..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div id="product-manager-list" class="flex-1 overflow-y-auto divide-y text-xs space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- SALES REPORT MODAL -->
+    <div id="sales-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Sales Summary & Financial Overview</h3>
+                <button onclick="closeSalesModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <div class="grid grid-cols-3 gap-3 bg-teal-50 p-3 rounded border border-teal-200 text-center">
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-teal-800">Total Revenue</p>
+                    <p id="sales-total-revenue" class="text-sm font-black text-teal-900">BHD 0.000</p>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-teal-800">Collected Payments</p>
+                    <p id="sales-total-collected" class="text-sm font-black text-teal-700">BHD 0.000</p>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-teal-800">Outstanding Due</p>
+                    <p id="sales-total-due" class="text-sm font-black text-red-600">BHD 0.000</p>
+                </div>
+            </div>
+            <div class="font-bold text-xs text-gray-700 pt-2">All Transactions / Orders</div>
+            <div id="sales-list-container" class="flex-1 overflow-y-auto divide-y text-xs"></div>
         </div>
     </div>
 
@@ -95,7 +154,7 @@
     <div id="customer-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 space-y-3">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800">Select Customer</h3>
+                <h3 class="font-bold text-sm text-gray-800">Select Customer (Mandatory)</h3>
                 <button onclick="closeCustomerModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
             <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
@@ -153,7 +212,7 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://xzadxvbucxqsiogvfacm.supabase.co';
+        const SUPABASE_URL = 'https://xzadxbvucxqsiogvfacm.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6YWR4dmJ1Y3hxc2lvZ3ZmYWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMjY3NDgsImV4cCI6MjEwOTgwMjc0OH0.jf1o535fzulqM5h1jyhNBjzzJcckLsF_Yp4EdVOFrOw';
 
         let supabaseClient = null;
@@ -293,7 +352,6 @@
 
             document.getElementById('summary-pieces').innerText = totalPieces + ' pcs';
             document.getElementById('summary-total').innerText = formatBHD(total);
-            document.getElementById('advance-payment-input').value = total.toFixed(3);
         }
 
         function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); renderCustomerList(); }
@@ -329,8 +387,10 @@
 
         function selectCustomer(c) {
             selectedCustomer = c;
+            document.getElementById('disp-cust-name').className = 'font-bold text-xs text-gray-800';
             document.getElementById('disp-cust-name').innerText = c.name;
             document.getElementById('disp-cust-phone').innerText = c.phone;
+            document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-red-600';
             document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(c.outstanding_balance);
         }
 
@@ -351,19 +411,38 @@
             }
         }
 
-        async function checkoutOrder() {
+        // --- REQUIREMENT 3 & 4: MANDATORY CUSTOMER & ADVANCE PAYMENT PROMPT ---
+        function promptCheckout() {
+            if (cart.length === 0) return alert('Ticket is empty');
+            if (!selectedCustomer) {
+                alert('Mandatory: Please select or register a customer before creating an order ticket.');
+                openCustomerModal();
+                return;
+            }
+            const total = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            document.getElementById('adv-modal-total').innerText = formatBHD(total);
+            document.getElementById('modal-advance-input').value = total.toFixed(3);
+            document.getElementById('advance-modal').classList.remove('hidden');
+        }
+
+        function closeAdvanceModal() {
+            document.getElementById('advance-modal').classList.add('hidden');
+        }
+
+        async function confirmCheckoutOrder() {
+            closeAdvanceModal();
             if (cart.length === 0) return alert('Ticket is empty');
             const total = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-            const advancePaid = parseFloat(document.getElementById('advance-payment-input').value) || 0;
+            const advancePaid = parseFloat(document.getElementById('modal-advance-input').value) || 0;
             const balanceDue = Math.max(0, total - advancePaid);
-            const custName = selectedCustomer ? selectedCustomer.name : 'Walk-in Customer';
-            const custPhone = selectedCustomer ? selectedCustomer.phone : 'N/A';
+            const custName = selectedCustomer.name;
+            const custPhone = selectedCustomer.phone;
             const payStatus = advancePaid >= total ? 'PAID' : (advancePaid > 0 ? 'PARTIAL' : 'PENDING');
 
             let newOrderId = null;
             if (supabaseClient) {
                 const { data: orderData, error } = await supabaseClient.from('laundry_orders').insert([{
-                    customer_id: selectedCustomer ? selectedCustomer.id : null,
+                    customer_id: selectedCustomer.id,
                     customer_name: custName,
                     customer_phone: custPhone,
                     subtotal: total,
@@ -406,8 +485,91 @@
             }
 
             alert('Laundry Ticket Created Successfully!');
+            printReceipt(newOrderId);
             clearCart();
             await fetchOrders();
+        }
+
+        // --- REQUIREMENT 1: PRODUCT & PRICE MANAGER ---
+        function openProductManager() {
+            document.getElementById('product-manager-modal').classList.remove('hidden');
+            renderProductManagerList();
+        }
+        function closeProductManager() {
+            document.getElementById('product-manager-modal').classList.add('hidden');
+        }
+        function renderProductManagerList() {
+            const term = document.getElementById('prod-mgr-search').value.toLowerCase();
+            const container = document.getElementById('product-manager-list');
+            container.innerHTML = '';
+            services.filter(s => s.name.toLowerCase().includes(term) || s.sku.toLowerCase().includes(term) || s.category.toLowerCase().includes(term)).forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'py-2 flex justify-between items-center gap-2';
+                div.innerHTML = `
+                    <div class="flex-1">
+                        <span class="text-[9px] font-bold px-1 py-0.5 rounded bg-teal-100 text-teal-800">${s.category}</span>
+                        <p class="font-bold text-gray-800">${s.name} <span class="text-gray-400 font-normal">(${s.sku})</span></p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" step="0.001" id="prod-price-${s.id}" value="${s.retail_price.toFixed(3)}" class="w-24 border rounded p-1 text-right font-bold text-xs">
+                        <button onclick="updateProductPrice('${s.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-1 rounded font-bold text-xs">Save</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        async function updateProductPrice(productId) {
+            const newPrice = parseFloat(document.getElementById(`prod-price-${productId}`).value);
+            if (isNaN(newPrice) || newPrice < 0) return alert('Enter a valid price');
+            if (supabaseClient) {
+                const { error } = await supabaseClient.from('products').update({ retail_price: newPrice }).eq('id', productId);
+                if (error) return alert('Error updating price: ' + error.message);
+                alert('Product price updated successfully!');
+                await fetchServices();
+                renderProductManagerList();
+            }
+        }
+
+        // --- REQUIREMENT 2: VIEW SALES WINDOW ---
+        function openSalesModal() {
+            document.getElementById('sales-modal').classList.remove('hidden');
+            renderSalesSummary();
+        }
+        function closeSalesModal() {
+            document.getElementById('sales-modal').classList.add('hidden');
+        }
+        function renderSalesSummary() {
+            let totalRevenue = 0;
+            let totalCollected = 0;
+            let totalDue = 0;
+
+            activeOrders.forEach(o => {
+                totalRevenue += (o.total_amount || 0);
+                totalCollected += (o.paid_amount || 0);
+                totalDue += (o.balance_due || 0);
+            });
+
+            document.getElementById('sales-total-revenue').innerText = formatBHD(totalRevenue);
+            document.getElementById('sales-total-collected').innerText = formatBHD(totalCollected);
+            document.getElementById('sales-total-due').innerText = formatBHD(totalDue);
+
+            const container = document.getElementById('sales-list-container');
+            container.innerHTML = '';
+            activeOrders.forEach(o => {
+                const div = document.createElement('div');
+                div.className = 'py-2.5 flex justify-between items-center';
+                div.innerHTML = `
+                    <div>
+                        <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name} (${o.customer_phone})<br>
+                        <span class="text-gray-400 text-[10px]">${new Date(o.created_at).toLocaleString()} | Status: ${o.order_status}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="font-bold text-teal-700">${formatBHD(o.total_amount)}</span><br>
+                        <span class="text-gray-500 text-[10px]">Paid: ${formatBHD(o.paid_amount)} | Due: <strong class="text-red-600">${formatBHD(o.balance_due)}</strong></span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
         }
 
         function openOrdersModal() { document.getElementById('orders-modal').classList.remove('hidden'); renderOrdersList(); }
