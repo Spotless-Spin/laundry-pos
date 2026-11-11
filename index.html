@@ -6,6 +6,7 @@
     <title>Spotless Spin Laundry W.L.L. - Bahrain POS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         @media print {
@@ -30,11 +31,12 @@
             <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Active Tickets</button>
             <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
             <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
+            <button onclick="openAdminDashboard()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Admin Dashboard</button>
         </div>
     </header>
 
-    <!-- Main Workspace -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+    <!-- Main Workspace (POS Dashboard View) -->
+    <div id="pos-view" class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
         <!-- Left: Service Catalog -->
         <div class="w-full md:w-3/5 p-4 flex flex-col h-full overflow-hidden">
@@ -87,6 +89,105 @@
         </div>
     </div>
 
+    <!-- CUSTOMER LEDGER VIEW (IN-TAB) -->
+    <div id="customer-ledger-view" class="hidden flex-1 flex flex-col overflow-y-auto p-6 bg-gray-50">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 class="text-xl font-bold text-teal-800">Customer Ledger & Account History</h1>
+                <p class="text-xs text-gray-500">Spotless Spin Laundry W.L.L. - Bahrain Hub</p>
+            </div>
+            <button onclick="closeCustomerLedgerView()" class="bg-gray-800 hover:bg-gray-900 text-white font-bold px-4 py-2 rounded text-xs shadow">
+                &larr; Back to Dashboard
+            </button>
+        </div>
+        <div class="mb-4">
+            <input type="text" id="ledger-search-input" onkeyup="renderCustomerLedgerView()" placeholder="Search customer ledger by name, mobile or customer #..." class="w-full max-w-md px-3 py-2 border rounded text-xs outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+        </div>
+        <div id="customer-ledger-container" class="space-y-4"></div>
+    </div>
+
+    <!-- ADMIN DASHBOARD VIEW (IN-TAB) -->
+    <div id="admin-dashboard-view" class="hidden flex-1 flex flex-col overflow-y-auto p-6 bg-gray-50 space-y-6">
+        <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div>
+                <h1 class="text-xl font-bold text-teal-800">Admin Analytics & Financial Dashboard</h1>
+                <p class="text-xs text-gray-500">Comprehensive overview of revenue, payments, and ticket statuses.</p>
+            </div>
+            <button onclick="closeAdminDashboard()" class="bg-gray-800 hover:bg-gray-900 text-white font-bold px-4 py-2 rounded text-xs shadow">
+                &larr; Back to Dashboard
+            </button>
+        </div>
+
+        <!-- Date Filters & Stats Cards -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap gap-4 items-end justify-between">
+            <div class="flex flex-wrap gap-3 items-end">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-gray-600 mb-1">From Date</label>
+                    <input type="date" id="admin-date-from" class="border rounded px-3 py-1.5 text-xs outline-none bg-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-gray-600 mb-1">To Date</label>
+                    <input type="date" id="admin-date-to" class="border rounded px-3 py-1.5 text-xs outline-none bg-white">
+                </div>
+                <button onclick="renderAdminDashboard()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-1.5 rounded text-xs shadow">Apply Filter</button>
+                <button onclick="resetAdminDateFilter()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 py-1.5 rounded text-xs">Reset</button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="setAdminDatePreset('today')" class="border px-2.5 py-1 rounded text-xs hover:bg-gray-100 font-semibold">Today</button>
+                <button onclick="setAdminDatePreset('month')" class="border px-2.5 py-1 rounded text-xs hover:bg-gray-100 font-semibold">This Month</button>
+                <button onclick="setAdminDatePreset('all')" class="border px-2.5 py-1 rounded text-xs hover:bg-gray-100 font-semibold">All Time</button>
+            </div>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-teal-100">
+                <p class="text-[10px] uppercase font-bold text-teal-800">Total Revenue</p>
+                <p id="admin-kpi-revenue" class="text-lg font-black text-teal-900 mt-1">BHD 0.000</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-teal-100">
+                <p class="text-[10px] uppercase font-bold text-teal-800">Collected Payments</p>
+                <p id="admin-kpi-collected" class="text-lg font-black text-teal-700 mt-1">BHD 0.000</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-red-100">
+                <p class="text-[10px] uppercase font-bold text-red-800">Outstanding Due</p>
+                <p id="admin-kpi-due" class="text-lg font-black text-red-600 mt-1">BHD 0.000</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-blue-100">
+                <p class="text-[10px] uppercase font-bold text-blue-800">Total Tickets</p>
+                <p id="admin-kpi-tickets" class="text-lg font-black text-blue-900 mt-1">0</p>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
+                <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Daily Revenue Trend</h3>
+                <div class="flex-1 relative flex items-center justify-center">
+                    <canvas id="chart-revenue-trend"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
+                <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Payment Methods Breakdown</h3>
+                <div class="flex-1 relative flex items-center justify-center">
+                    <canvas id="chart-payment-methods"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
+                <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Ticket Status Breakdown</h3>
+                <div class="flex-1 relative flex items-center justify-center">
+                    <canvas id="chart-order-statuses"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
+                <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Top 5 Services Sold (Pieces)</h3>
+                <div class="flex-1 relative flex items-center justify-center">
+                    <canvas id="chart-top-services"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ADVANCE PAYMENT & PAYMENT METHOD PROMPT MODAL -->
     <div id="advance-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4">
@@ -125,15 +226,51 @@
         </div>
     </div>
 
-    <!-- PRODUCT MANAGER MODAL -->
+    <!-- PRODUCT MANAGER MODAL (WITH ADMIN ADD/EDIT/DELETE) -->
     <div id="product-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-2">
-                <h3 class="font-bold text-sm text-gray-800">Manage Products & Retail Prices</h3>
+                <h3 class="font-bold text-sm text-gray-800">Manage Products, Prices & Inventory</h3>
                 <button onclick="closeProductManager()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="prod-mgr-search" onkeyup="renderProductManagerList()" placeholder="Search products by name, SKU or category..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <input type="text" id="prod-mgr-search" onkeyup="renderProductManagerList()" placeholder="Search products by name, SKU or category..." class="flex-1 border rounded px-3 py-2 text-xs outline-none">
+                <button onclick="openProductEditModal(null)" class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-2 rounded text-xs">+ Add New Product</button>
+            </div>
             <div id="product-manager-list" class="flex-1 overflow-y-auto divide-y text-xs space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- PRODUCT EDIT / ADD MODAL -->
+    <div id="product-edit-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 id="prod-edit-modal-title" class="font-bold text-sm text-gray-800">Add / Edit Product</h3>
+                <button onclick="closeProductEditModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="hidden" id="edit-prod-id">
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">SKU *</label>
+                    <input type="text" id="edit-prod-sku" placeholder="e.g. DRY-99" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Product Name *</label>
+                    <input type="text" id="edit-prod-name" placeholder="e.g. Silk Shirt (Dry Cleaning)" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Category</label>
+                    <input type="text" id="edit-prod-category" placeholder="e.g. Dry Cleaning" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Retail Price (BHD) *</label>
+                    <input type="number" step="0.001" id="edit-prod-price" value="0.000" class="w-full border rounded p-2 outline-none font-semibold text-right">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeProductEditModal()" class="w-1/2 bg-gray-200 text-gray-700 font-bold py-2 rounded text-xs">Cancel</button>
+                <button onclick="saveProductDetails()" class="w-1/2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs">Save Product</button>
+            </div>
         </div>
     </div>
 
@@ -177,6 +314,35 @@
                 <input type="text" id="new-name" placeholder="Full Name *" class="w-full border rounded p-1.5 text-xs">
                 <input type="text" id="new-phone" placeholder="Mobile Number (e.g. 39xxxxxx) *" class="w-full border rounded p-1.5 text-xs">
                 <button onclick="createCustomer()" class="w-full bg-teal-600 text-white font-bold py-1.5 rounded text-xs">Save & Attach</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER EDIT MODAL (ADMIN) -->
+    <div id="customer-edit-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Edit Customer Details</h3>
+                <button onclick="closeCustomerEditModal()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="hidden" id="edit-cust-id">
+            <div class="space-y-2 text-xs">
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Full Name *</label>
+                    <input type="text" id="edit-cust-name" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Mobile Number *</label>
+                    <input type="text" id="edit-cust-phone" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Email</label>
+                    <input type="email" id="edit-cust-email" class="w-full border rounded p-2 outline-none font-semibold">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeCustomerEditModal()" class="w-1/2 bg-gray-200 text-gray-700 font-bold py-2 rounded text-xs">Cancel</button>
+                <button onclick="saveCustomerDetails()" class="w-1/2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded text-xs">Save Changes</button>
             </div>
         </div>
     </div>
@@ -238,8 +404,15 @@
         let services = [];
         let customers = [];
         let activeOrders = [];
+        let orderPaymentsList = [];
         let selectedCustomer = null;
         let cart = [];
+
+        // Chart instances
+        let chartRevenueTrendInstance = null;
+        let chartPaymentMethodsInstance = null;
+        let chartOrderStatusesInstance = null;
+        let chartTopServicesInstance = null;
 
         const formatBHD = (amt) => 'BHD ' + (Math.round((amt || 0) * 1000) / 1000).toFixed(3);
 
@@ -247,6 +420,7 @@
             await fetchServices();
             await fetchCustomers();
             await fetchOrders();
+            await fetchPayments();
         };
 
         async function fetchServices() {
@@ -270,6 +444,12 @@
             if (!supabaseClient) return;
             const { data } = await supabaseClient.from('laundry_orders').select('*, order_items(*)').order('created_at', { ascending: false });
             if (data) activeOrders = data;
+        }
+
+        async function fetchPayments() {
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('order_payments').select('*');
+            if (data) orderPaymentsList = data;
         }
 
         function renderServices() {
@@ -385,83 +565,117 @@
         }
         function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
 
-        async function openCustomerManager() { 
+        // IN-TAB CUSTOMER LEDGER
+        async function openCustomerManager() {
             await fetchCustomers();
             await fetchOrders();
-            
-            const newWindow = window.open('', '_blank');
-            if (!newWindow) {
-                alert('Please allow popups for this website to open the customer ledger in a new page.');
+            document.getElementById('pos-view').classList.add('hidden');
+            document.getElementById('admin-dashboard-view').classList.add('hidden');
+            document.getElementById('customer-ledger-view').classList.remove('hidden');
+            renderCustomerLedgerView();
+        }
+        function closeCustomerLedgerView() {
+            document.getElementById('customer-ledger-view').classList.add('hidden');
+            document.getElementById('pos-view').classList.remove('hidden');
+        }
+
+        async function renderCustomerLedgerView() {
+            await fetchCustomers();
+            await fetchOrders();
+            const term = document.getElementById('ledger-search-input').value.toLowerCase();
+            const container = document.getElementById('customer-ledger-container');
+            container.innerHTML = '';
+
+            const filtered = customers.filter(c => 
+                c.name.toLowerCase().includes(term) || 
+                c.phone.includes(term) || 
+                String(c.customer_number || '').includes(term)
+            );
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="bg-white p-6 rounded-xl shadow-sm text-center text-gray-400 text-xs">No customer records found.</div>';
                 return;
             }
 
-            let customerRowsHtml = customers.map(c => {
+            filtered.forEach(c => {
                 const custOrders = activeOrders.filter(o => o.customer_id === c.id);
                 let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
                     <tr>
-                        <td style="padding: 6px; border-bottom: 1px solid #eee;">#${o.ticket_number}</td>
-                        <td style="padding: 6px; border-bottom: 1px solid #eee;">${new Date(o.created_at).toLocaleDateString()}</td>
-                        <td style="padding: 6px; border-bottom: 1px solid #eee;">${o.order_status}</td>
-                        <td style="padding: 6px; border-bottom: 1px solid #eee; text-align: right;">${formatBHD(o.total_amount)}</td>
-                        <td style="padding: 6px; border-bottom: 1px solid #eee; text-align: right; color: red;">${formatBHD(o.balance_due)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee;">#${o.ticket_number}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${new Date(o.created_at).toLocaleDateString()}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.order_status}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatBHD(o.total_amount)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; color: red; font-weight: bold;">${formatBHD(o.balance_due)}</td>
                     </tr>
-                `).join('') : `<tr><td colspan="5" style="padding: 6px; color: #888;">No orders recorded yet.</td></tr>`;
+                `).join('') : `<tr><td colspan="5" style="padding: 8px; color: #888;">No orders recorded yet.</td></tr>`;
 
                 const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
 
-                return `
-                    <div style="background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
-                            <div>
-                                <h3 style="margin: 0; color: #0d9488; font-size: 16px;">${c.name} <span style="font-size: 12px; background: #ccfbf1; color: #115e59; padding: 2px 6px; border-radius: 4px;">Cust #${formattedCustNo}</span></h3>
-                                <span style="font-size: 12px; color: #666;">Mobile: ${c.phone} | Total Spent: ${formatBHD(c.total_spent)}</span>
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="font-size: 13px; font-weight: bold; color: #dc2626;">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
-                            </div>
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <div>
+                            <h3 class="font-bold text-teal-800 text-base">${c.name} <span class="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded ml-2">Cust #${formattedCustNo}</span></h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Mobile: ${c.phone} | Email: ${c.email || 'N/A'} | Total Spent: ${formatBHD(c.total_spent)}</p>
                         </div>
-                        <h4 style="margin: 5px 0; font-size: 12px; color: #444; text-transform: uppercase;">Order / Ticket History</h4>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                            <thead>
-                                <tr style="background: #f8fafc; text-align: left;">
-                                    <th style="padding: 6px; border-bottom: 2px solid #ddd;">Ticket #</th>
-                                    <th style="padding: 6px; border-bottom: 2px solid #ddd;">Date</th>
-                                    <th style="padding: 6px; border-bottom: 2px solid #ddd;">Status</th>
-                                    <th style="padding: 6px; border-bottom: 2px solid #ddd; text-align: right;">Total</th>
-                                    <th style="padding: 6px; border-bottom: 2px solid #ddd; text-align: right;">Due</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${ordersHtml}
-                            </tbody>
-                        </table>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-sm font-bold text-red-600">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
+                            <button onclick="openCustomerEditModal('${c.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow">Edit Customer</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase text-gray-600 mb-2">Order / Ticket History</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-left text-gray-700">
+                                        <th class="p-2 border-b">Ticket #</th>
+                                        <th class="p-2 border-b">Date</th>
+                                        <th class="p-2 border-b">Status</th>
+                                        <th class="p-2 border-b text-right">Total</th>
+                                        <th class="p-2 border-b text-right">Due</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${ordersHtml}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
-            }).join('');
+                container.appendChild(card);
+            });
+        }
 
-            newWindow.document.write(`
-                <!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Customer Ledger & Accounts - Spotless Spin Laundry W.L.L.</title>
-                    <style>
-                        body { font-family: sans-serif; background: #f3f4f6; padding: 20px; color: #1f2937; margin: 0; }
-                        h1 { color: #0f766e; margin-bottom: 5px; }
-                        p { color: #4b5563; margin-top: 0; }
-                    </style>
-                </head>
-                <body>
-                    <h1>Customer Ledger & Account History</h1>
-                    <p>Spotless Spin Laundry W.L.L. - Bahrain Hub</p>
-                    <hr style="border: 0; border-top: 1px solid #d1d5db; margin-bottom: 20px;">
-                    <div>
-                        ${customerRowsHtml || '<p>No customer records found.</p>'}
-                    </div>
-                </body>
-                </html>
-            `);
-            newWindow.document.close();
+        // CUSTOMER EDIT MODAL (ADMIN)
+        function openCustomerEditModal(customerId) {
+            const cust = customers.find(c => c.id === customerId);
+            if (!cust) return;
+            document.getElementById('edit-cust-id').value = cust.id;
+            document.getElementById('edit-cust-name').value = cust.name;
+            document.getElementById('edit-cust-phone').value = cust.phone;
+            document.getElementById('edit-cust-email').value = cust.email || '';
+            document.getElementById('customer-edit-modal').classList.remove('hidden');
+        }
+        function closeCustomerEditModal() {
+            document.getElementById('customer-edit-modal').classList.add('hidden');
+        }
+        async function saveCustomerDetails() {
+            const id = document.getElementById('edit-cust-id').value;
+            const name = document.getElementById('edit-cust-name').value.trim();
+            const phone = document.getElementById('edit-cust-phone').value.trim();
+            const email = document.getElementById('edit-cust-email').value.trim();
+
+            if (!name || !phone) return alert('Name and mobile are required.');
+            if (supabaseClient) {
+                const { error } = await supabaseClient.from('contacts').update({ name, phone, email }).eq('id', id);
+                if (error) return alert('Error updating customer: ' + error.message);
+                alert('Customer details updated successfully!');
+                closeCustomerEditModal();
+                await fetchCustomers();
+                renderCustomerLedgerView();
+            }
         }
 
         async function renderCustomerList() {
@@ -600,8 +814,10 @@
             printReceipt(newOrderId);
             clearCart();
             await fetchOrders();
+            await fetchPayments();
         }
 
+        // PRODUCT MANAGER (ADMIN: ADD, EDIT, DELETE)
         function openProductManager() {
             document.getElementById('product-manager-modal').classList.remove('hidden');
             renderProductManagerList();
@@ -613,29 +829,90 @@
             const term = document.getElementById('prod-mgr-search').value.toLowerCase();
             const container = document.getElementById('product-manager-list');
             container.innerHTML = '';
-            services.filter(s => s.name.toLowerCase().includes(term) || s.sku.toLowerCase().includes(term) || s.category.toLowerCase().includes(term)).forEach(s => {
+            
+            const filtered = services.filter(s => s.name.toLowerCase().includes(term) || s.sku.toLowerCase().includes(term) || s.category.toLowerCase().includes(term));
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-gray-400 text-xs">No products found.</div>';
+                return;
+            }
+
+            filtered.forEach(s => {
                 const div = document.createElement('div');
-                div.className = 'py-2 flex justify-between items-center gap-2';
+                div.className = 'py-2.5 flex justify-between items-center gap-2';
                 div.innerHTML = `
                     <div class="flex-1">
-                        <span class="text-[9px] font-bold px-1 py-0.5 rounded bg-teal-100 text-teal-800">${s.category}</span>
-                        <p class="font-bold text-gray-800">${s.name} <span class="text-gray-400 font-normal">(${s.sku})</span></p>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">${s.category}</span>
+                        <p class="font-bold text-gray-800 mt-0.5">${s.name} <span class="text-gray-400 font-normal">(${s.sku})</span></p>
+                        <p class="text-teal-700 font-bold text-xs">${formatBHD(s.retail_price)}</p>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <input type="number" step="0.001" id="prod-price-${s.id}" value="${s.retail_price.toFixed(3)}" class="w-24 border rounded p-1 text-right font-bold text-xs">
-                        <button onclick="updateProductPrice('${s.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-1 rounded font-bold text-xs">Save</button>
+                        <button onclick="openProductEditModal('${s.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-1 rounded font-bold text-xs">Edit</button>
+                        <button onclick="deleteProduct('${s.id}')" class="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1 rounded font-bold text-xs">Delete</button>
                     </div>
                 `;
                 container.appendChild(div);
             });
         }
-        async function updateProductPrice(productId) {
-            const newPrice = parseFloat(document.getElementById(`prod-price-${productId}`).value);
-            if (isNaN(newPrice) || newPrice < 0) return alert('Enter a valid price');
+
+        function openProductEditModal(productId) {
+            document.getElementById('product-edit-modal').classList.remove('hidden');
+            if (!productId) {
+                document.getElementById('prod-edit-modal-title').innerText = 'Add New Product';
+                document.getElementById('edit-prod-id').value = '';
+                document.getElementById('edit-prod-sku').value = '';
+                document.getElementById('edit-prod-name').value = '';
+                document.getElementById('edit-prod-category').value = 'Garments';
+                document.getElementById('edit-prod-price').value = '0.000';
+            } else {
+                document.getElementById('prod-edit-modal-title').innerText = 'Edit Product Details';
+                const s = services.find(item => item.id === productId);
+                if (s) {
+                    document.getElementById('edit-prod-id').value = s.id;
+                    document.getElementById('edit-prod-sku').value = s.sku;
+                    document.getElementById('edit-prod-name').value = s.name;
+                    document.getElementById('edit-prod-category').value = s.category;
+                    document.getElementById('edit-prod-price').value = s.retail_price.toFixed(3);
+                }
+            }
+        }
+        function closeProductEditModal() {
+            document.getElementById('product-edit-modal').classList.add('hidden');
+        }
+
+        async function saveProductDetails() {
+            const id = document.getElementById('edit-prod-id').value;
+            const sku = document.getElementById('edit-prod-sku').value.trim();
+            const name = document.getElementById('edit-prod-name').value.trim();
+            const category = document.getElementById('edit-prod-category').value.trim() || 'Garments';
+            const retail_price = parseFloat(document.getElementById('edit-prod-price').value);
+
+            if (!sku || !name || isNaN(retail_price) || retail_price < 0) {
+                return alert('Please enter valid SKU, Name, and Price.');
+            }
+
             if (supabaseClient) {
-                const { error } = await supabaseClient.from('products').update({ retail_price: newPrice }).eq('id', productId);
-                if (error) return alert('Error updating price: ' + error.message);
-                alert('Product price updated successfully!');
+                if (!id) {
+                    const { error } = await supabaseClient.from('products').insert([{ sku, name, category, retail_price }]);
+                    if (error) return alert('Error creating product: ' + error.message);
+                    alert('Product created successfully!');
+                } else {
+                    const { error } = await supabaseClient.from('products').update({ sku, name, category, retail_price }).eq('id', id);
+                    if (error) return alert('Error updating product: ' + error.message);
+                    alert('Product updated successfully!');
+                }
+                closeProductEditModal();
+                await fetchServices();
+                renderProductManagerList();
+            }
+        }
+
+        async function deleteProduct(productId) {
+            if (!confirm('Are you sure you want to delete this product?')) return;
+            if (supabaseClient) {
+                const { error } = await supabaseClient.from('products').delete().eq('id', productId);
+                if (error) return alert('Error deleting product: ' + error.message);
+                alert('Product deleted successfully!');
                 await fetchServices();
                 renderProductManagerList();
             }
@@ -679,6 +956,179 @@
                     </div>
                 `;
                 container.appendChild(div);
+            });
+        }
+
+        // ADMIN ANALYTICS DASHBOARD WITH CHARTS & DATE RANGE
+        async function openAdminDashboard() {
+            await fetchOrders();
+            await fetchPayments();
+            document.getElementById('pos-view').classList.add('hidden');
+            document.getElementById('customer-ledger-view').classList.add('hidden');
+            document.getElementById('admin-dashboard-view').classList.remove('hidden');
+            resetAdminDateFilter();
+        }
+        function closeAdminDashboard() {
+            document.getElementById('admin-dashboard-view').classList.add('hidden');
+            document.getElementById('pos-view').classList.remove('hidden');
+        }
+
+        function resetAdminDateFilter() {
+            document.getElementById('admin-date-from').value = '';
+            document.getElementById('admin-date-to').value = '';
+            renderAdminDashboard();
+        }
+
+        function setAdminDatePreset(preset) {
+            const now = new Date();
+            let fromStr = '';
+            let toStr = now.toISOString().split('T')[0];
+
+            if (preset === 'today') {
+                fromStr = toStr;
+            } else if (preset === 'month') {
+                fromStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            } else if (preset === 'all') {
+                fromStr = '';
+                toStr = '';
+            }
+
+            document.getElementById('admin-date-from').value = fromStr;
+            document.getElementById('admin-date-to').value = toStr;
+            renderAdminDashboard();
+        }
+
+        async function renderAdminDashboard() {
+            await fetchOrders();
+            await fetchPayments();
+
+            const fromVal = document.getElementById('admin-date-from').value;
+            const toVal = document.getElementById('admin-date-to').value;
+
+            let filteredOrders = activeOrders;
+            let filteredPayments = orderPaymentsList;
+
+            if (fromVal) {
+                const fromDate = new Date(fromVal);
+                fromDate.setHours(0,0,0,0);
+                filteredOrders = filteredOrders.filter(o => new Date(o.created_at) >= fromDate);
+                filteredPayments = filteredPayments.filter(p => new Date(p.created_at) >= fromDate);
+            }
+            if (toVal) {
+                const toDate = new Date(toVal);
+                toDate.setHours(23,59,59,999);
+                filteredOrders = filteredOrders.filter(o => new Date(o.created_at) <= toDate);
+                filteredPayments = filteredPayments.filter(p => new Date(p.created_at) <= toDate);
+            }
+
+            // KPIs
+            let totalRev = 0;
+            let totalColl = 0;
+            let totalDue = 0;
+            filteredOrders.forEach(o => {
+                totalRev += (o.total_amount || 0);
+                totalColl += (o.paid_amount || 0);
+                totalDue += (o.balance_due || 0);
+            });
+
+            document.getElementById('admin-kpi-revenue').innerText = formatBHD(totalRev);
+            document.getElementById('admin-kpi-collected').innerText = formatBHD(totalColl);
+            document.getElementById('admin-kpi-due').innerText = formatBHD(totalDue);
+            document.getElementById('admin-kpi-tickets').innerText = filteredOrders.length;
+
+            // 1. Daily Revenue Trend Chart Data
+            const dailyMap = {};
+            filteredOrders.forEach(o => {
+                const dayStr = new Date(o.created_at).toISOString().split('T')[0];
+                dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (o.total_amount || 0);
+            });
+            const sortedDays = Object.keys(dailyMap).sort();
+            const revenueData = sortedDays.map(d => dailyMap[d]);
+
+            if (chartRevenueTrendInstance) chartRevenueTrendInstance.destroy();
+            const ctxRev = document.getElementById('chart-revenue-trend').getContext('2d');
+            chartRevenueTrendInstance = new Chart(ctxRev, {
+                type: 'line',
+                data: {
+                    labels: sortedDays,
+                    datasets: [{
+                        label: 'Revenue (BHD)',
+                        data: revenueData,
+                        borderColor: '#0d9488',
+                        backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 2. Payment Methods Breakdown Chart Data
+            const methodMap = { CASH: 0, CARD: 0, BENEFIT_PAY: 0 };
+            filteredPayments.forEach(p => {
+                const m = p.payment_method || 'CASH';
+                methodMap[m] = (methodMap[m] || 0) + (p.amount_paid || 0);
+            });
+
+            if (chartPaymentMethodsInstance) chartPaymentMethodsInstance.destroy();
+            const ctxPay = document.getElementById('chart-payment-methods').getContext('2d');
+            chartPaymentMethodsInstance = new Chart(ctxPay, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Cash', 'Card', 'BenefitPay'],
+                    datasets: [{
+                        data: [methodMap['CASH'], methodMap['CARD'], methodMap['BENEFIT_PAY']],
+                        backgroundColor: ['#0d9488', '#3b82f6', '#f59e0b']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 3. Ticket Status Breakdown Chart Data
+            const statusMap = { OPEN: 0, PARTIALLY_PICKED: 0, COMPLETED: 0 };
+            filteredOrders.forEach(o => {
+                const st = o.order_status || 'OPEN';
+                statusMap[st] = (statusMap[st] || 0) + 1;
+            });
+
+            if (chartOrderStatusesInstance) chartOrderStatusesInstance.destroy();
+            const ctxStatus = document.getElementById('chart-order-statuses').getContext('2d');
+            chartOrderStatusesInstance = new Chart(ctxStatus, {
+                type: 'pie',
+                data: {
+                    labels: ['Open', 'Partially Picked', 'Completed'],
+                    datasets: [{
+                        data: [statusMap['OPEN'], statusMap['PARTIALLY_PICKED'], statusMap['COMPLETED']],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 4. Top 5 Services Sold (Pieces)
+            const serviceQtyMap = {};
+            filteredOrders.forEach(o => {
+                (o.order_items || []).forEach(item => {
+                    serviceQtyMap[item.item_name] = (serviceQtyMap[item.item_name] || 0) + (item.quantity || 0);
+                });
+            });
+            const sortedServices = Object.entries(serviceQtyMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            const topLabels = sortedServices.map(s => s[0]);
+            const topValues = sortedServices.map(s => s[1]);
+
+            if (chartTopServicesInstance) chartTopServicesInstance.destroy();
+            const ctxTop = document.getElementById('chart-top-services').getContext('2d');
+            chartTopServicesInstance = new Chart(ctxTop, {
+                type: 'bar',
+                data: {
+                    labels: topLabels,
+                    datasets: [{
+                        label: 'Pieces Sold',
+                        data: topValues,
+                        backgroundColor: '#0f766e'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
             });
         }
 
@@ -815,6 +1265,7 @@
             alert('Pickup tally updated successfully!');
             closePickupModal();
             await fetchOrders();
+            await fetchPayments();
             openOrdersModal();
         }
 
