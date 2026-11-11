@@ -27,7 +27,7 @@
         </div>
         <div class="flex items-center space-x-2 flex-wrap gap-1">
             <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
-            <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">All Active Tickets</button>
+            <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Active Tickets</button>
             <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
             <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
         </div>
@@ -170,7 +170,7 @@
                 <h3 class="font-bold text-sm text-gray-800">Select Customer (Mandatory)</h3>
                 <button onclick="closeCustomerModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name, mobile or customer #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
             <div id="cust-list" class="max-h-48 overflow-y-auto divide-y text-xs"></div>
             <div class="border-t pt-2 space-y-2 bg-gray-50 p-2 rounded">
                 <h4 class="text-[10px] font-bold uppercase text-gray-700">Register New Customer</h4>
@@ -181,14 +181,14 @@
         </div>
     </div>
 
-    <!-- ALL ORDERS & PARTIAL PICKUP MODAL -->
+    <!-- ACTIVE ORDERS & PARTIAL PICKUP MODAL -->
     <div id="orders-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-sm text-gray-800">Active Customer Tickets & Piece Tally</h3>
                 <button onclick="closeOrdersModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="order-search" onkeyup="renderOrdersList()" placeholder="Search by customer name, mobile or ticket #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <input type="text" id="order-search" onkeyup="renderOrdersList()" placeholder="Search by customer name, mobile, customer # or ticket #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
             <div id="orders-list-container" class="flex-1 overflow-y-auto divide-y text-xs"></div>
         </div>
     </div>
@@ -389,7 +389,6 @@
             await fetchCustomers();
             await fetchOrders();
             
-            // Opens Customer Ledger in a new browser window/tab
             const newWindow = window.open('', '_blank');
             if (!newWindow) {
                 alert('Please allow popups for this website to open the customer ledger in a new page.');
@@ -412,7 +411,7 @@
                     <div style="background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
                             <div>
-                                <h3 style="margin: 0; color: #0d9488; font-size: 16px;">${c.name}</h3>
+                                <h3 style="margin: 0; color: #0d9488; font-size: 16px;">${c.name} <span style="font-size: 12px; background: #ccfbf1; color: #115e59; padding: 2px 6px; border-radius: 4px;">Cust #${c.customer_number || '-'}</span></h3>
                                 <span style="font-size: 12px; color: #666;">Mobile: ${c.phone} | Total Spent: ${formatBHD(c.total_spent)}</span>
                             </div>
                             <div style="text-align: right;">
@@ -469,7 +468,12 @@
             const container = document.getElementById('cust-list');
             container.innerHTML = '';
             
-            const filtered = customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term));
+            const filtered = customers.filter(c => 
+                c.name.toLowerCase().includes(term) || 
+                c.phone.includes(term) || 
+                String(c.customer_number || '').includes(term)
+            );
+            
             if (filtered.length === 0) {
                 container.innerHTML = '<div class="p-3 text-gray-400 text-xs text-center">No customers found. Register a new customer below.</div>';
                 return;
@@ -479,7 +483,7 @@
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-teal-50 cursor-pointer flex justify-between items-center';
                 div.onclick = () => { selectCustomer(c); closeCustomerModal(); };
-                div.innerHTML = `<div><strong>${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
+                div.innerHTML = `<div><strong>#${c.customer_number || '-'} - ${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
                 container.appendChild(div);
             });
         }
@@ -487,7 +491,8 @@
         function selectCustomer(c) {
             selectedCustomer = c;
             document.getElementById('disp-cust-name').className = 'font-bold text-xs text-gray-800';
-            document.getElementById('disp-cust-name').innerText = c.name;
+            document.getElementById('disp-cust-name.').innerText = c.name;
+            document.getElementById('disp-cust-name').innerHTML = `${c.name} <span class="bg-teal-100 text-teal-800 px-1 rounded text-[10px]">#${c.customer_number || '-'}</span>`;
             document.getElementById('disp-cust-phone').innerText = c.phone;
             document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-red-600';
             document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(c.outstanding_balance);
@@ -682,7 +687,29 @@
             const container = document.getElementById('orders-list-container');
             container.innerHTML = '';
 
-            activeOrders.filter(o => o.customer_name.toLowerCase().includes(term) || o.customer_phone.includes(term) || String(o.ticket_number).includes(term)).forEach(o => {
+            // Filter active orders (hide COMPLETED tickets)
+            const uncompletedOrders = activeOrders.filter(o => {
+                const isCompleted = o.order_status === 'COMPLETED';
+                return !isCompleted;
+            });
+
+            const filtered = uncompletedOrders.filter(o => {
+                const cust = customers.find(c => c.id === o.customer_id);
+                const custNo = cust ? String(cust.customer_number || '') : '';
+                return o.customer_name.toLowerCase().includes(term) || 
+                       o.customer_phone.includes(term) || 
+                       custNo.includes(term) ||
+                       String(o.ticket_number).includes(term);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-gray-400 text-xs">No active tickets found.</div>';
+                return;
+            }
+
+            filtered.forEach(o => {
+                const cust = customers.find(c => c.id === o.customer_id);
+                const custNoStr = cust && cust.customer_number ? ` (Cust #${cust.customer_number})` : '';
                 const div = document.createElement('div');
                 div.className = 'py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
                 
@@ -690,7 +717,7 @@
 
                 div.innerHTML = `
                     <div>
-                        <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name} (${o.customer_phone})<br>
+                        <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name}${custNoStr} (${o.customer_phone})<br>
                         <span class="text-gray-500 text-[10px]">Status: ${o.order_status} | Payment: ${o.payment_status}</span><br>
                         <div class="text-teal-700 font-medium text-[11px] mt-1">${itemsSummary}</div>
                     </div>
