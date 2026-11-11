@@ -26,15 +26,15 @@
             <span class="bg-teal-900 text-teal-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">Bahrain Hub</span>
         </div>
         <div class="flex items-center space-x-2 flex-wrap gap-1">
-            <button onclick="openCustomerLedgerPage()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
+            <button onclick="openCustomerManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Customer Ledger</button>
             <button onclick="openOrdersModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">All Active Tickets</button>
             <button onclick="openProductManager()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">Manage Products</button>
             <button onclick="openSalesModal()" class="bg-teal-800 hover:bg-teal-900 text-white text-xs px-2.5 py-1.5 rounded transition font-semibold">View Sales</button>
         </div>
     </header>
 
-    <!-- Main Workspace (POS View) -->
-    <div id="pos-workspace" class="flex-1 flex flex-col md:flex-row overflow-hidden">
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
         <!-- Left: Service Catalog -->
         <div class="w-full md:w-3/5 p-4 flex flex-col h-full overflow-hidden">
@@ -87,21 +87,6 @@
         </div>
     </div>
 
-    <!-- Customer Ledger Full Page View (Hidden by default) -->
-    <div id="ledger-workspace" class="flex-1 flex flex-col p-6 overflow-y-auto hidden bg-gray-50">
-        <div class="max-w-4xl w-full mx-auto space-y-4">
-            <div class="flex justify-between items-center border-b pb-3">
-                <div>
-                    <h2 class="font-bold text-lg text-gray-800">Customer Accounts & Outstanding Ledger</h2>
-                    <p class="text-xs text-gray-500">View customer profiles, contact info, total spending, and individual order history.</p>
-                </div>
-                <button onclick="backToPOS()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-xs font-bold shadow">Back to POS</button>
-            </div>
-            <input type="text" id="ledger-page-search" onkeyup="renderCustomerLedgerPageList()" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none bg-white shadow-sm">
-            <div id="ledger-page-list" class="space-y-3"></div>
-        </div>
-    </div>
-
     <!-- ADVANCE PAYMENT PROMPT MODAL -->
     <div id="advance-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4">
@@ -109,7 +94,7 @@
                 <h3 class="font-bold text-sm text-gray-800">Advance Payment Details</h3>
                 <button onclick="closeAdvanceModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <div class="space-y-2 text-xs">
+            <div class="space-y-3 text-xs">
                 <p class="text-gray-600">Has any advance payment been made for this ticket?</p>
                 <div class="flex justify-between font-bold text-gray-800">
                     <span>Total Ticket Amount:</span>
@@ -118,6 +103,23 @@
                 <div>
                     <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Advance Amount Paid (BHD)</label>
                     <input type="number" id="modal-advance-input" step="0.001" value="0.000" class="w-full border rounded p-2 text-right font-bold text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Payment Method</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold">
+                            <input type="radio" name="payment-method" value="CASH" checked class="accent-teal-600">
+                            <span>Cash</span>
+                        </label>
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold">
+                            <input type="radio" name="payment-method" value="CARD" class="accent-teal-600">
+                            <span>Card</span>
+                        </label>
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold">
+                            <input type="radio" name="payment-method" value="BENEFIT PAY" class="accent-teal-600">
+                            <span>BenefitPay</span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="flex space-x-2 pt-2">
@@ -183,6 +185,18 @@
         </div>
     </div>
 
+    <!-- CUSTOMER MANAGER MODAL -->
+    <div id="customer-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="font-bold text-sm text-gray-800">Customer Accounts, Ledger & Order History</h3>
+                <button onclick="closeCustomerManager()" class="text-gray-400 font-bold">&times;</button>
+            </div>
+            <input type="text" id="manager-cust-search" onkeyup="renderCustomerManagerList()" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <div id="customer-manager-list" class="flex-1 overflow-y-auto divide-y text-xs space-y-3"></div>
+        </div>
+    </div>
+
     <!-- ALL ORDERS & PARTIAL PICKUP MODAL -->
     <div id="orders-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
@@ -204,10 +218,27 @@
             </div>
             <input type="hidden" id="pickup-order-id">
             <div id="pickup-items-list" class="space-y-2 max-h-60 overflow-y-auto text-xs divide-y"></div>
-            <div class="border-t pt-2 space-y-2">
+            <div class="border-t pt-2 space-y-3">
                 <div>
                     <label class="text-[10px] font-bold uppercase text-gray-600">Collect Remaining Balance Payment Now (BHD)</label>
                     <input type="number" id="pickup-payment-add" step="0.001" value="0.000" class="w-full border rounded p-1.5 text-right font-bold text-sm">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Payment Method</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold text-xs">
+                            <input type="radio" name="pickup-payment-method" value="CASH" checked class="accent-teal-600">
+                            <span>Cash</span>
+                        </label>
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold text-xs">
+                            <input type="radio" name="pickup-payment-method" value="CARD" class="accent-teal-600">
+                            <span>Card</span>
+                        </label>
+                        <label class="border rounded p-2 text-center cursor-pointer hover:border-teal-600 flex items-center justify-center space-x-1 font-semibold text-xs">
+                            <input type="radio" name="pickup-payment-method" value="BENEFIT PAY" class="accent-teal-600">
+                            <span>BenefitPay</span>
+                        </label>
+                    </div>
                 </div>
                 <button onclick="confirmPartialPickup()" class="w-full bg-teal-600 text-white font-bold py-2 rounded text-xs">Confirm Pickup & Update Tally</button>
             </div>
@@ -321,11 +352,11 @@
             updateCartUI();
         }
 
-        // --- REQUIREMENT 1: CLEAR ALL CART & CUSTOMER NAME ---
+        // Requirement 1: Clear cart items and clear customer name
         function clearCart() { 
             cart = []; 
             selectedCustomer = null;
-            document.getElementById('disp-cust-name.className') = 'font-bold text-xs text-red-600';
+            document.getElementById('disp-cust-name').className = 'font-bold text-xs text-red-600';
             document.getElementById('disp-cust-name').innerText = 'No customer selected *';
             document.getElementById('disp-cust-phone').innerText = 'Please select a customer';
             document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-gray-400';
@@ -367,45 +398,112 @@
             document.getElementById('summary-total').innerText = formatBHD(total);
         }
 
-        function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); renderCustomerList(); }
+        async function openCustomerModal() { 
+            await fetchCustomers();
+            document.getElementById('customer-modal').classList.remove('hidden'); 
+            renderCustomerList(); 
+        }
         function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
 
-        // --- REQUIREMENT 2: CUSTOMER LEDGER OPENS AS A NEW PAGE VIEW ---
-        async function openCustomerLedgerPage() {
+        // Requirement 2: Customer ledger should open in a new page/tab or full window view
+        async function openCustomerManager() { 
             await fetchCustomers();
             await fetchOrders();
-            document.getElementById('pos-workspace').classList.add('hidden');
-            document.getElementById('ledger-workspace').classList.remove('hidden');
-            renderCustomerLedgerPageList();
+            
+            const newWindow = window.open('', '_blank');
+            if (!newWindow) {
+                // Fallback in case popup blockers prevent new window opening
+                document.getElementById('customer-manager-modal').classList.remove('hidden');
+                renderCustomerManagerList();
+                return;
+            }
+
+            let ledgerRowsHtml = '';
+            for (const c of customers) {
+                const custOrders = activeOrders.filter(o => o.customer_id === c.id);
+                let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; background: #ffffff; padding: 6px; margin-bottom: 4px; border: 1px solid #e5e7eb; border-radius: 4px;">
+                        <span>Ticket #${o.ticket_number} (${new Date(o.created_at).toLocaleDateString()}) - Status: <strong>${o.order_status}</strong></span>
+                        <span>Total: ${formatBHD(o.total_amount)} | <strong style="color: #dc2626;">Due: ${formatBHD(o.balance_due)}</strong></span>
+                    </div>
+                `).join('') : '<p style="color: #9ca3af; font-size: 11px;">No orders recorded for this customer yet.</p>';
+
+                ledgerRowsHtml += `
+                    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <strong style="font-size: 14px; color: #0f766e;">${c.name}</strong><br>
+                                <span style="color: #4b5563; font-size: 12px;">Mobile: ${c.phone} | Total Spent: ${formatBHD(c.total_spent)}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 12px; font-weight: bold; color: #dc2626;">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                            <p style="font-size: 10px; font-weight: bold; color: #374151; text-transform: uppercase; margin-bottom: 4px;">Customer Orders / Tickets:</p>
+                            ${ordersHtml}
+                        </div>
+                    </div>
+                `;
+            }
+
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Customer Ledger & Accounts - Spotless Spin Laundry W.L.L.</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                </head>
+                <body class="bg-gray-100 font-sans p-6">
+                    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6 space-y-4">
+                        <div class="flex justify-between items-center border-b pb-4">
+                            <h1 class="font-bold text-lg text-gray-800">Customer Accounts, Ledger & Order History</h1>
+                            <button onclick="window.close()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded font-bold text-xs">Close Page</button>
+                        </div>
+                        <input type="text" id="popup-cust-search" placeholder="Search customer ledger by name or mobile..." class="w-full border rounded px-3 py-2 text-xs outline-none" oninput="filterLedger(this.value)">
+                        <div id="ledger-container" class="space-y-3 max-h-[75vh] overflow-y-auto">
+                            ${ledgerRowsHtml}
+                        </div>
+                    </div>
+                    <script>
+                        function filterLedger(query) {
+                            const term = query.toLowerCase();
+                            const items = document.querySelectorAll('#ledger-container > div');
+                            items.forEach(item => {
+                                const text = item.innerText.toLowerCase();
+                                item.style.display = text.includes(term) ? 'block' : 'none';
+                            });
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
         }
 
-        function backToPOS() {
-            document.getElementById('ledger-workspace').classList.add('hidden');
-            document.getElementById('pos-workspace').classList.remove('hidden');
-        }
-
-        function renderCustomerLedgerPageList() {
-            const term = document.getElementById('ledger-page-search').value.toLowerCase();
-            const container = document.getElementById('ledger-page-list');
+        function renderCustomerManagerList() {
+            const term = document.getElementById('manager-cust-search').value.toLowerCase();
+            const container = document.getElementById('customer-manager-list');
             container.innerHTML = '';
             
             const filtered = customers.filter(c => c.name.toLowerCase().includes(term) || c.phone.includes(term));
             if (filtered.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-4 bg-white rounded border">No customers found.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-4">No customers found.</p>';
                 return;
             }
 
             filtered.forEach(c => {
                 const custOrders = activeOrders.filter(o => o.customer_id === c.id);
                 const div = document.createElement('div');
-                div.className = 'p-4 bg-white rounded-lg border border-gray-200 shadow-sm space-y-3';
+                div.className = 'p-3 bg-gray-50 rounded border border-gray-200 space-y-2';
                 
                 let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
-                    <div class="flex justify-between items-center text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                    <div class="flex justify-between items-center text-[11px] bg-white p-1.5 rounded border border-gray-100">
                         <span>Ticket #${o.ticket_number} (${new Date(o.created_at).toLocaleDateString()}) - Status: <strong>${o.order_status}</strong></span>
                         <span>Total: ${formatBHD(o.total_amount)} | <strong class="text-red-600">Due: ${formatBHD(o.balance_due)}</strong></span>
                     </div>
-                `).join('') : '<p class="text-gray-400 text-xs">No orders recorded for this customer yet.</p>';
+                `).join('') : '<p class="text-gray-400 text-[11px]">No orders recorded for this customer yet.</p>';
 
                 div.innerHTML = `
                     <div class="flex justify-between items-start">
@@ -417,8 +515,8 @@
                             <span class="text-xs font-bold text-red-600">Outstanding Due: ${formatBHD(c.outstanding_balance)}</span>
                         </div>
                     </div>
-                    <div class="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
-                        <p class="text-[11px] font-bold text-gray-700 uppercase">Customer Orders / Tickets:</p>
+                    <div class="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                        <p class="text-[10px] font-bold text-gray-700 uppercase">Customer Orders / Tickets:</p>
                         ${ordersHtml}
                     </div>
                 `;
@@ -483,6 +581,7 @@
             const total = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
             document.getElementById('adv-modal-total').innerText = formatBHD(total);
             document.getElementById('modal-advance-input').value = total.toFixed(3);
+            document.querySelector('input[name="payment-method"][value="CASH"]').checked = true;
             document.getElementById('advance-modal').classList.remove('hidden');
         }
 
@@ -490,6 +589,7 @@
             document.getElementById('advance-modal').classList.add('hidden');
         }
 
+        // Requirement 3: Create ticket button window provides payment options (Cash, Card, Benefit Pay)
         async function confirmCheckoutOrder() {
             closeAdvanceModal();
             if (cart.length === 0) return alert('Ticket is empty');
@@ -499,6 +599,8 @@
             const custName = selectedCustomer.name;
             const custPhone = selectedCustomer.phone;
             const payStatus = advancePaid >= total ? 'PAID' : (advancePaid > 0 ? 'PARTIAL' : 'PENDING');
+            
+            const selectedPaymentMethod = document.querySelector('input[name="payment-method"]:checked')?.value || 'CASH';
 
             let newOrderId = null;
             if (supabaseClient) {
@@ -529,7 +631,11 @@
                 await supabaseClient.from('order_items').insert(itemsPayload);
 
                 if (advancePaid > 0) {
-                    await supabaseClient.from('order_payments').insert([{ order_id: newOrderId, amount_paid: advancePaid }]);
+                    await supabaseClient.from('order_payments').insert([{ 
+                        order_id: newOrderId, 
+                        amount_paid: advancePaid,
+                        payment_method: selectedPaymentMethod
+                    }]);
                 }
 
                 if (selectedCustomer) {
@@ -669,6 +775,7 @@
             if (!currentPickupOrder) return;
             document.getElementById('pickup-order-id').value = orderId;
             document.getElementById('pickup-payment-add').value = currentPickupOrder.balance_due.toFixed(3);
+            document.querySelector('input[name="pickup-payment-method"][value="CASH"]').checked = true;
 
             const container = document.getElementById('pickup-items-list');
             container.innerHTML = '';
@@ -689,9 +796,11 @@
         }
         function closePickupModal() { document.getElementById('pickup-modal').classList.add('hidden'); }
 
+        // Requirement 4: Partial pickup option provides all 3 payment options (Cash, Card, Benefit Pay)
         async function confirmPartialPickup() {
             const orderId = document.getElementById('pickup-order-id').value;
             const additionalPayment = parseFloat(document.getElementById('pickup-payment-add').value) || 0;
+            const selectedPickupPaymentMethod = document.querySelector('input[name="pickup-payment-method"]:checked')?.value || 'CASH';
             
             let allItemsPickedUp = true;
             let updatedItems = [...currentPickupOrder.order_items];
@@ -719,7 +828,11 @@
                 }).eq('id', orderId);
 
                 if (additionalPayment > 0) {
-                    await supabaseClient.from('order_payments').insert([{ order_id: orderId, amount_paid: additionalPayment }]);
+                    await supabaseClient.from('order_payments').insert([{ 
+                        order_id: orderId, 
+                        amount_paid: additionalPayment,
+                        payment_method: selectedPickupPaymentMethod
+                    }]);
                 }
 
                 if (currentPickupOrder.customer_id && additionalPayment > 0) {
@@ -786,7 +899,6 @@
                     <p>Thank you for choosing Spotless Spin!</p>
                 </div>
             `;
-            printContainer.classList.add('hidden'); // ensure hidden initially
             printContainer.classList.remove('hidden');
             window.print();
             printContainer.classList.add('hidden');
