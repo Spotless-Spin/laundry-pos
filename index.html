@@ -407,11 +407,13 @@
                     </tr>
                 `).join('') : `<tr><td colspan="5" style="padding: 6px; color: #888;">No orders recorded yet.</td></tr>`;
 
+                const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
+
                 return `
                     <div style="background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
                             <div>
-                                <h3 style="margin: 0; color: #0d9488; font-size: 16px;">${c.name} <span style="font-size: 12px; background: #ccfbf1; color: #115e59; padding: 2px 6px; border-radius: 4px;">Cust #${c.customer_number || '-'}</span></h3>
+                                <h3 style="margin: 0; color: #0d9488; font-size: 16px;">${c.name} <span style="font-size: 12px; background: #ccfbf1; color: #115e59; padding: 2px 6px; border-radius: 4px;">Cust #${formattedCustNo}</span></h3>
                                 <span style="font-size: 12px; color: #666;">Mobile: ${c.phone} | Total Spent: ${formatBHD(c.total_spent)}</span>
                             </div>
                             <div style="text-align: right;">
@@ -480,19 +482,20 @@
             }
 
             filtered.forEach(c => {
+                const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-teal-50 cursor-pointer flex justify-between items-center';
                 div.onclick = () => { selectCustomer(c); closeCustomerModal(); };
-                div.innerHTML = `<div><strong>#${c.customer_number || '-'} - ${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
+                div.innerHTML = `<div><strong>#${formattedCustNo} - ${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
                 container.appendChild(div);
             });
         }
 
         function selectCustomer(c) {
             selectedCustomer = c;
+            const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
             document.getElementById('disp-cust-name').className = 'font-bold text-xs text-gray-800';
-            document.getElementById('disp-cust-name.').innerText = c.name;
-            document.getElementById('disp-cust-name').innerHTML = `${c.name} <span class="bg-teal-100 text-teal-800 px-1 rounded text-[10px]">#${c.customer_number || '-'}</span>`;
+            document.getElementById('disp-cust-name').innerHTML = `${c.name} <span class="bg-teal-100 text-teal-800 px-1 rounded text-[10px]">#${formattedCustNo}</span>`;
             document.getElementById('disp-cust-phone').innerText = c.phone;
             document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-red-600';
             document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(c.outstanding_balance);
@@ -687,7 +690,6 @@
             const container = document.getElementById('orders-list-container');
             container.innerHTML = '';
 
-            // Filter active orders (hide COMPLETED tickets)
             const uncompletedOrders = activeOrders.filter(o => {
                 const isCompleted = o.order_status === 'COMPLETED';
                 return !isCompleted;
@@ -709,7 +711,7 @@
 
             filtered.forEach(o => {
                 const cust = customers.find(c => c.id === o.customer_id);
-                const custNoStr = cust && cust.customer_number ? ` (Cust #${cust.customer_number})` : '';
+                const custNoStr = cust && cust.customer_number ? ` (Cust #${String(cust.customer_number).padStart(4, '0')})` : '';
                 const div = document.createElement('div');
                 div.className = 'py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
                 
