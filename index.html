@@ -153,7 +153,7 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://xzadxvbucxqsiogvfacm.supabase.co';
+        const SUPABASE_URL = 'https://xzadxbvucxqsiogvfacm.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6YWR4dmJ1Y3hxc2lvZ3ZmYWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMjY3NDgsImV4cCI6MjEwOTgwMjc0OH0.jf1o535fzulqM5h1jyhNBjzzJcckLsF_Yp4EdVOFrOw';
 
         let supabaseClient = null;
@@ -366,6 +366,7 @@
                     customer_id: selectedCustomer ? selectedCustomer.id : null,
                     customer_name: custName,
                     customer_phone: custPhone,
+                    subtotal: total,
                     total_amount: total,
                     paid_amount: advancePaid,
                     balance_due: balanceDue,
@@ -389,6 +390,18 @@
 
                 if (advancePaid > 0) {
                     await supabaseClient.from('order_payments').insert([{ order_id: newOrderId, amount_paid: advancePaid }]);
+                }
+
+                if (selectedCustomer) {
+                    const newOutstanding = (selectedCustomer.outstanding_balance || 0) + balanceDue;
+                    const newTotalSpent = (selectedCustomer.total_spent || 0) + total;
+                    await supabaseClient.from('contacts').update({
+                        outstanding_balance: newOutstanding,
+                        total_spent: newTotalSpent
+                    }).eq('id', selectedCustomer.id);
+                    selectedCustomer.outstanding_balance = newOutstanding;
+                    selectedCustomer.total_spent = newTotalSpent;
+                    await fetchCustomers();
                 }
             }
 
@@ -486,6 +499,18 @@
 
                 if (additionalPayment > 0) {
                     await supabaseClient.from('order_payments').insert([{ order_id: orderId, amount_paid: additionalPayment }]);
+                }
+
+                if (currentPickupOrder.customer_id && additionalPayment > 0) {
+                    const cust = customers.find(c => c.id === currentPickupOrder.customer_id);
+                    if (cust) {
+                        const newOutstanding = Math.max(0, (cust.outstanding_balance || 0) - additionalPayment);
+                        await supabaseClient.from('contacts').update({
+                            outstanding_balance: newOutstanding
+                        }).eq('id', cust.id);
+                        cust.outstanding_balance = newOutstanding;
+                        await fetchCustomers();
+                    }
                 }
             }
 
