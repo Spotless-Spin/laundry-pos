@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f766e">
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         @media print {
@@ -424,7 +426,7 @@
         let activeOrders = [];
         let orderPaymentsList = [];
         let posUsersList = [];
-        let currentUser = null; // { name, role }
+        let currentUser = null; 
         let selectedCustomer = null;
         let cart = [];
 
@@ -437,6 +439,11 @@
         const formatBHD = (amt) => 'BHD ' + (Math.round((amt || 0) * 1000) / 1000).toFixed(3);
 
         window.onload = async () => {
+            // Register Service Worker for PWA / iOS / Android support
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+            }
+
             await fetchUsers();
             await fetchServices();
             await fetchCustomers();
@@ -450,7 +457,6 @@
             if (data && data.length > 0) {
                 posUsersList = data;
             } else {
-                // Fallback default users if table is empty
                 posUsersList = [
                     { name: 'OWNER', pin_code: '4321', role: 'ADMIN' },
                     { name: 'ATTENDANT', pin_code: '1122', role: 'CASHIER' }
@@ -462,7 +468,6 @@
             const pin = document.getElementById('pin-input').value.trim();
             const errEl = document.getElementById('pin-error-msg');
             
-            // Check against fetched posUsersList
             const foundUser = posUsersList.find(u => u.pin_code === pin);
             if (foundUser) {
                 currentUser = { name: foundUser.name, role: foundUser.role };
@@ -480,7 +485,6 @@
             document.getElementById('pin-input').value = '';
             document.getElementById('pin-error-msg').classList.add('hidden');
             document.getElementById('pin-login-modal').classList.remove('hidden');
-            // Reset views
             document.getElementById('customer-ledger-view').classList.add('hidden');
             document.getElementById('admin-dashboard-view').classList.add('hidden');
             document.getElementById('pos-view').classList.remove('hidden');
@@ -688,7 +692,6 @@
                 `).join('') : `<tr><td colspan="5" style="padding: 8px; color: #888;">No orders recorded yet.</td></tr>`;
 
                 const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
-
                 const editBtnHtml = isAdmin ? `<button onclick="openCustomerEditModal('${c.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow">Edit Customer</button>` : '';
 
                 const card = document.createElement('div');
