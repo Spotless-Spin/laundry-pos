@@ -246,6 +246,28 @@
         </div>
     </div>
 
+    <!-- POST-CHECKOUT RECEIPT ACTION MODAL (PRINT OR WHATSAPP) -->
+    <div id="receipt-action-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-5 text-center">
+            <div>
+                <div class="w-12 h-12 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center mx-auto mb-2 text-xl font-bold">✓</div>
+                <h3 class="font-bold text-base text-gray-800">Ticket Created Successfully!</h3>
+                <p id="receipt-action-subtitle" class="text-xs text-gray-500 mt-1">Ticket #0001 created for customer.</p>
+            </div>
+            <div class="space-y-2.5">
+                <button onclick="actionPrintReceipt()" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 rounded-xl shadow transition text-xs flex items-center justify-center space-x-2">
+                    <span>🖨️ Print Receipt Now</span>
+                </button>
+                <button onclick="actionSendWhatsApp()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow transition text-xs flex items-center justify-center space-x-2">
+                    <span>💬 Send Ticket via WhatsApp</span>
+                </button>
+            </div>
+            <button onclick="closeReceiptActionModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition">
+                Skip / Close
+            </button>
+        </div>
+    </div>
+
     <!-- PRODUCT MANAGER MODAL (WITH ADMIN ADD/EDIT/DELETE) -->
     <div id="product-manager-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
@@ -429,6 +451,7 @@
         let currentUser = null; 
         let selectedCustomer = null;
         let cart = [];
+        let lastCreatedOrderId = null; // Track newly created order for post-checkout actions
 
         // Chart instances
         let chartRevenueTrendInstance = null;
@@ -899,11 +922,61 @@
                 }
             }
 
-            alert('Laundry Ticket Created Successfully!');
-            printReceipt(newOrderId);
+            lastCreatedOrderId = newOrderId;
+            const createdOrder = activeOrders.find(o => o.id === newOrderId) || { ticket_number: 'New', customer_name: custName };
+            
+            // Open Action Modal instead of direct auto-print
+            document.getElementById('receipt-action-subtitle').innerText = `Ticket #${createdOrder.ticket_number || 'New'} created for ${custName} (${custPhone}).`;
+            document.getElementById('receipt-action-modal').classList.remove('hidden');
+
             clearCart();
             await fetchOrders();
             await fetchPayments();
+        }
+
+        function closeReceiptActionModal() {
+            document.getElementById('receipt-action-modal').classList.add('hidden');
+        }
+
+        function actionPrintReceipt() {
+            closeReceiptActionModal();
+            if (lastCreatedOrderId) {
+                printReceipt(lastCreatedOrderId);
+            }
+        }
+
+        function actionSendWhatsApp() {
+            closeReceiptActionModal();
+            if (!lastCreatedOrderId) return;
+            const order = activeOrders.find(o => o.id === lastCreatedOrderId);
+            if (!order) return;
+
+            let phone = (order.customer_phone || '').trim();
+            // Format phone number for WhatsApp (remove spaces, ensure country code if needed or keep standard)
+            if (!phone.startsWith('+')) {
+                // Default to Bahrain +973 if starts with 3 or similar local formats
+                if (phone.length === 8 && (phone.startsWith('3') || phone.startsWith('6'))) {
+                    phone = '973' + phone;
+                }
+            } else {
+                phone = phone.replace('+', '');
+            }
+
+            const itemsText = (order.order_items || []).map(i => `- ${i.quantity}x ${i.item_name} (${formatBHD(i.total_price)})`).join('\n');
+            
+            const message = `*SPOTLESS SPIN LAUNDRY W.L.L.*\n` +
+                `Kingdom of Bahrain | Tel: 33205757\n\n` +
+                `*Ticket #${order.ticket_number}*\n` +
+                `Customer: ${order.customer_name}\n` +
+                `Date: ${new Date(order.created_at).toLocaleString()}\n\n` +
+                `*Items:*\n${itemsText}\n\n` +
+                `*Total Amount:* ${formatBHD(order.total_amount)}\n` +
+                `*Paid Advance:* ${formatBHD(order.paid_amount)}\n` +
+                `*Balance Due:* ${formatBHD(order.balance_due)}\n\n` +
+                `Thank you for choosing Spotless Spin!`;
+
+            const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
         }
 
         // PRODUCT MANAGER (ADMIN: ADD, EDIT, DELETE)
