@@ -121,7 +121,7 @@
             </button>
         </div>
         <div class="mb-4">
-            <input type="text" id="ledger-search-input" onkeyup="renderCustomerLedgerView()" placeholder="Search customer ledger by name, mobile or customer #..." class="w-full max-w-md px-3 py-2 border rounded text-xs outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+            <input type="text" id="ledger-search-input" onkeyup="renderCustomerLedgerView()" placeholder="Search by name, mobile or Ref # (e.g. 1001)..." class="w-full max-w-md px-3 py-2 border rounded text-xs outline-none focus:ring-2 focus:ring-teal-500 bg-white">
         </div>
         <div id="customer-ledger-container" class="space-y-4"></div>
     </div>
@@ -349,7 +349,7 @@
                 <h3 class="font-bold text-sm text-gray-800">Select Customer (Mandatory)</h3>
                 <button onclick="closeCustomerModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name, mobile or customer #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <input type="text" id="cust-search" onkeyup="renderCustomerList()" placeholder="Search by name, mobile or Ref # (e.g. 1001)..." class="w-full border rounded px-3 py-2 text-xs outline-none">
             <div id="cust-list" class="max-h-48 overflow-y-auto divide-y text-xs"></div>
             <div class="border-t pt-2 space-y-2 bg-gray-50 p-2 rounded">
                 <h4 class="text-[10px] font-bold uppercase text-gray-700">Register New Customer</h4>
@@ -396,7 +396,7 @@
                 <h3 class="font-bold text-sm text-gray-800">Active Customer Tickets & Piece Tally</h3>
                 <button onclick="closeOrdersModal()" class="text-gray-400 font-bold">&times;</button>
             </div>
-            <input type="text" id="order-search" onkeyup="renderOrdersList()" placeholder="Search by customer name, mobile, customer # or ticket #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
+            <input type="text" id="order-search" onkeyup="renderOrdersList()" placeholder="Search by customer name, mobile, Ref # or ticket #..." class="w-full border rounded px-3 py-2 text-xs outline-none">
             <div id="orders-list-container" class="flex-1 overflow-y-auto divide-y text-xs"></div>
         </div>
     </div>
@@ -539,7 +539,7 @@
 
         async function fetchCustomers() {
             if (!supabaseClient) return;
-            const { data } = await supabaseClient.from('contacts').select('*').order('name');
+            const { data } = await supabaseClient.from('contacts').select('*').order('customer_number', { ascending: true });
             if (data) customers = data;
         }
 
@@ -714,7 +714,7 @@
                     </tr>
                 `).join('') : `<tr><td colspan="5" style="padding: 8px; color: #888;">No orders recorded yet.</td></tr>`;
 
-                const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
+                const formattedCustNo = c.customer_number || '-';
                 const editBtnHtml = isAdmin ? `<button onclick="openCustomerEditModal('${c.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded font-bold text-xs shadow">Edit Customer</button>` : '';
 
                 const card = document.createElement('div');
@@ -722,7 +722,7 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-center border-b pb-3">
                         <div>
-                            <h3 class="font-bold text-teal-800 text-base">${c.name} <span class="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded ml-2">Cust #${formattedCustNo}</span></h3>
+                            <h3 class="font-bold text-teal-800 text-base">${c.name} <span class="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded ml-2">Ref #${formattedCustNo}</span></h3>
                             <p class="text-xs text-gray-500 mt-0.5">Mobile: ${c.phone} | Email: ${c.email || 'N/A'} | Total Spent: ${formatBHD(c.total_spent)}</p>
                         </div>
                         <div class="flex items-center space-x-3">
@@ -808,20 +808,20 @@
             }
 
             filtered.forEach(c => {
-                const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
+                const formattedCustNo = c.customer_number || '-';
                 const div = document.createElement('div');
                 div.className = 'p-2 hover:bg-teal-50 cursor-pointer flex justify-between items-center';
                 div.onclick = () => { selectCustomer(c); closeCustomerModal(); };
-                div.innerHTML = `<div><strong>#${formattedCustNo} - ${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
+                div.innerHTML = `<div><strong>Ref #${formattedCustNo} - ${c.name}</strong><br><span class="text-gray-500">${c.phone}</span></div><span class="text-red-600 font-bold">${formatBHD(c.outstanding_balance)}</span>`;
                 container.appendChild(div);
             });
         }
 
         function selectCustomer(c) {
             selectedCustomer = c;
-            const formattedCustNo = c.customer_number ? String(c.customer_number).padStart(4, '0') : '-';
+            const formattedCustNo = c.customer_number || '-';
             document.getElementById('disp-cust-name').className = 'font-bold text-xs text-gray-800';
-            document.getElementById('disp-cust-name').innerHTML = `${c.name} <span class="bg-teal-100 text-teal-800 px-1 rounded text-[10px]">#${formattedCustNo}</span>`;
+            document.getElementById('disp-cust-name').innerHTML = `${c.name} <span class="bg-teal-100 text-teal-800 px-1 rounded text-[10px]">Ref #${formattedCustNo}</span>`;
             document.getElementById('disp-cust-phone').innerText = c.phone;
             document.getElementById('disp-cust-balance').className = 'text-xs font-bold text-red-600';
             document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(c.outstanding_balance);
@@ -1349,7 +1349,7 @@
 
             filtered.forEach(o => {
                 const cust = customers.find(c => c.id === o.customer_id);
-                const custNoStr = cust && cust.customer_number ? ` (Cust #${String(cust.customer_number).padStart(4, '0')})` : '';
+                const custNoStr = cust && cust.customer_number ? ` (Ref #${cust.customer_number})` : '';
                 const div = document.createElement('div');
                 div.className = 'py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
                 
