@@ -318,7 +318,7 @@
 
     <!-- SALES REPORT MODAL -->
     <div id="sales-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-3 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full p-5 space-y-3 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b pb-2">
                 <h3 class="font-bold text-sm text-gray-800">Sales Summary & Financial Overview</h3>
                 <button onclick="closeSalesModal()" class="text-gray-400 font-bold">&times;</button>
@@ -948,7 +948,11 @@
         function actionSendWhatsApp() {
             closeReceiptActionModal();
             if (!lastCreatedOrderId) return;
-            const order = activeOrders.find(o => o.id === lastCreatedOrderId);
+            sendWhatsAppForOrder(lastCreatedOrderId);
+        }
+
+        function sendWhatsAppForOrder(orderId) {
+            const order = activeOrders.find(o => o.id === orderId);
             if (!order) return;
 
             let phone = (order.customer_phone || '').trim();
@@ -1124,9 +1128,15 @@
                         <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name} (${o.customer_phone})<br>
                         <span class="text-gray-400 text-[10px]">${new Date(o.created_at).toLocaleString()} | Status: ${o.order_status}</span>
                     </div>
-                    <div class="text-right">
-                        <span class="font-bold text-teal-700">${formatBHD(o.total_amount)}</span><br>
-                        <span class="text-gray-500 text-[10px]">Paid: ${formatBHD(o.paid_amount)} | Due: <strong class="text-red-600">${formatBHD(o.balance_due)}</strong></span>
+                    <div class="flex items-center space-x-3">
+                        <div class="text-right">
+                            <span class="font-bold text-teal-700">${formatBHD(o.total_amount)}</span><br>
+                            <span class="text-gray-500 text-[10px]">Paid: ${formatBHD(o.paid_amount)} | Due: <strong class="text-red-600">${formatBHD(o.balance_due)}</strong></span>
+                        </div>
+                        <div class="space-x-1 flex">
+                            <button onclick="printReceipt('${o.id}')" class="bg-gray-800 hover:bg-gray-900 text-white px-2.5 py-1.5 rounded font-bold text-xs shadow">🖨️ Print</button>
+                            <button onclick="sendWhatsAppForOrder('${o.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded font-bold text-xs shadow">💬 WhatsApp</button>
+                        </div>
                     </div>
                 `;
                 container.appendChild(div);
@@ -1353,9 +1363,10 @@
                     </div>
                     <div class="text-right space-y-1">
                         <div>Total: ${formatBHD(o.total_amount)} | <span class="text-red-600 font-bold">Due: ${formatBHD(o.balance_due)}</span></div>
-                        <div class="space-x-1">
-                            <button onclick="openPickupModal('${o.id}')" class="bg-teal-600 text-white px-2 py-1 rounded font-bold">Partial Pickup</button>
-                            <button onclick="printReceipt('${o.id}')" class="bg-gray-800 text-white px-2 py-1 rounded">Print</button>
+                        <div class="space-x-1 flex flex-wrap justify-end gap-1">
+                            <button onclick="openPickupModal('${o.id}')" class="bg-teal-600 hover:bg-teal-700 text-white px-2.5 py-1 rounded font-bold text-xs shadow">Partial Pickup</button>
+                            <button onclick="printReceipt('${o.id}')" class="bg-gray-800 hover:bg-gray-900 text-white px-2.5 py-1 rounded font-bold text-xs shadow">🖨️ Print</button>
+                            <button onclick="sendWhatsAppForOrder('${o.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded font-bold text-xs shadow">💬 WhatsApp</button>
                         </div>
                     </div>
                 `;
