@@ -965,21 +965,18 @@
             ).join('\n');
             
             const message = `*SPOTLESS SPIN LAUNDRY W.L.L.*\n` +
-                `_Your clothes deserve a better spin_\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `📋 *NEW TICKET #${order.ticket_number}*\n` +
-                `📅 Date: ${new Date(order.created_at).toLocaleString()}\n` +
-                `👤 Customer: ${order.customer_name}\n` +
-                `📞 Mobile: ${order.customer_phone}\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `👕 *ITEMIZED DETAILS:*\n${itemsText}\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `💰 *Total Amount:* ${formatBHD(order.total_amount)}\n` +
-                `💵 *Paid Advance:* ${formatBHD(order.paid_amount)}\n` +
-                `🔴 *Balance Due:* ${formatBHD(order.balance_due)}\n` +
-                `━━━━━━━━━━━━━━━━━━━\n` +
-                `📞 WhatsApp: 33205757\n` +
-                `🛵 Delivery Helpline: 38070611\n` +
+                `_Your Clothes Deserve A Better Spin_\n\n` +
+                `*TICKET #${order.ticket_number}*\n` +
+                `Date: ${new Date(order.created_at).toLocaleString()}\n` +
+                `Customer: ${order.customer_name}\n` +
+                `Mobile: ${order.customer_phone}\n\n` +
+                `*ITEMIZED DETAILS:*\n${itemsText}\n\n` +
+                `*Total Amount:* ${formatBHD(order.total_amount)}\n` +
+                `*Paid Advance:* ${formatBHD(order.paid_amount)}\n` +
+                `*Balance Due:* ${formatBHD(order.balance_due)}\n` +
+                `━ ━ ━ ━ ━ ━ ━ ━ ━ ━\n` +
+                ` WhatsApp: 33205757\n` +
+                ` Pick Up & Delivery: 38070611\n` +
                 `_Thank you for choosing Spotless Spin!_`;
 
             const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
