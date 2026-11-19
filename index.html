@@ -195,25 +195,25 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
                 <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Daily Revenue Trend</h3>
-                <div class="flex-1 relative flex items-center justify-center">
+                <div class="flex-1 relative w-full h-full">
                     <canvas id="chart-revenue-trend"></canvas>
                 </div>
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
                 <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Payment Methods Breakdown</h3>
-                <div class="flex-1 relative flex items-center justify-center">
+                <div class="flex-1 relative w-full h-full">
                     <canvas id="chart-payment-methods"></canvas>
                 </div>
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
                 <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Ticket Status Breakdown</h3>
-                <div class="flex-1 relative flex items-center justify-center">
+                <div class="flex-1 relative w-full h-full">
                     <canvas id="chart-order-statuses"></canvas>
                 </div>
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-80">
                 <h3 class="font-bold text-xs text-gray-700 uppercase mb-3">Top 5 Services Sold (Pieces)</h3>
-                <div class="flex-1 relative flex items-center justify-center">
+                <div class="flex-1 relative w-full h-full">
                     <canvas id="chart-top-services"></canvas>
                 </div>
             </div>
@@ -242,7 +242,7 @@
                 </div>
                 <div>
                     <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Advance Amount Paid (BHD)</label>
-                    <input type="number" id="modal-advance-input" step="0.001" value="0.000" class="w-full border rounded p-2 text-right font-bold text-sm outline-none focus:ring-2 focus:ring-teal-500">
+                    <input type="number" id="modal-advance-input" step="0.001" min="0" value="0.000" class="w-full border rounded p-2 text-right font-bold text-sm outline-none focus:ring-2 focus:ring-teal-500">
                 </div>
                 <div>
                     <label class="text-[10px] font-bold uppercase text-teal-800 block mb-1">Payment Method</label>
@@ -326,7 +326,7 @@
                 </div>
                 <div>
                     <label class="block font-bold uppercase text-[10px] text-gray-600 mb-1">Retail Price (BHD) *</label>
-                    <input type="number" step="0.001" id="edit-prod-price" value="0.000" class="w-full border rounded p-2 outline-none font-semibold text-right">
+                    <input type="number" step="0.001" min="0" id="edit-prod-price" value="0.000" class="w-full border rounded p-2 outline-none font-semibold text-right">
                 </div>
             </div>
             <div class="flex space-x-2 pt-2">
@@ -433,7 +433,7 @@
             <div class="border-t pt-2 space-y-3">
                 <div>
                     <label class="text-[10px] font-bold uppercase text-gray-600">Collect Remaining Balance Payment Now (BHD)</label>
-                    <input type="number" id="pickup-payment-add" step="0.001" value="0.000" class="w-full border rounded p-1.5 text-right font-bold text-sm">
+                    <input type="number" id="pickup-payment-add" step="0.001" min="0" value="0.000" class="w-full border rounded p-1.5 text-right font-bold text-sm">
                 </div>
                 <div>
                     <label class="text-[10px] font-bold uppercase text-gray-600 block mb-1">Payment Method</label>
@@ -471,7 +471,7 @@
         let currentUser = null; 
         let selectedCustomer = null;
         let cart = [];
-        let lastCreatedOrderId = null; // Track newly created order for post-checkout actions
+        let lastCreatedOrderId = null;
 
         // Chart instances
         let chartRevenueTrendInstance = null;
@@ -479,8 +479,27 @@
         let chartOrderStatusesInstance = null;
         let chartTopServicesInstance = null;
 
-        const formatBHD = (amt) => 'BHD ' + (Math.round((amt || 0) * 1000) / 1000).toFixed(3);
+        // Fils helpers (1 BHD = 1000 fils) to avoid floating-point rounding drift
+        const toFils = (amt) => Math.round((Number(amt) || 0) * 1000);
+        const fromFils = (fils) => Number((Math.round(Number(fils) || 0) / 1000).toFixed(3));
+        const formatBHD = (amt) => 'BHD ' + fromFils(toFils(amt)).toFixed(3);
 
+        // Bahrain timezone helpers
+        const formatDateTimeBH = (isoOrDate) => {
+            if (!isoOrDate) return '';
+            const d = new Date(isoOrDate);
+            if (isNaN(d.getTime())) return String(isoOrDate);
+            return d.toLocaleString('en-GB', { timeZone: 'Asia/Bahrain' });
+        };
+
+        const formatDateBH = (isoOrDate) => {
+            if (!isoOrDate) return '';
+            const d = new Date(isoOrDate);
+            if (isNaN(d.getTime())) return String(isoOrDate);
+            return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
+        };
+
+        // Customer number formatting helpers
         const formatCustNumber = (custNo) => {
             if (custNo === null || custNo === undefined || custNo === '') return '-';
             return String(custNo).padStart(4, '0');
@@ -489,25 +508,37 @@
         const getOrderCustomerNumber = (order) => {
             if (order && order.customer_id) {
                 const cust = customers.find(c => c.id === order.customer_id);
-                if (cust && cust.customer_number) return formatCustNumber(cust.customer_number);
+                if (cust && cust.customer_number !== null && cust.customer_number !== undefined && cust.customer_number !== '') {
+                    return formatCustNumber(cust.customer_number);
+                }
             }
             if (order && order.customer_phone) {
                 const custByPhone = customers.find(c => c.phone === order.customer_phone);
-                if (custByPhone && custByPhone.customer_number) return formatCustNumber(custByPhone.customer_number);
+                if (custByPhone && custByPhone.customer_number !== null && custByPhone.customer_number !== undefined && custByPhone.customer_number !== '') {
+                    return formatCustNumber(custByPhone.customer_number);
+                }
             }
             return '-';
         };
 
+        // Cart subtotal, discount & total helper in exact fils
         const getCartTotals = () => {
-            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            const subtotalFils = cart.reduce((acc, i) => acc + (toFils(i.price) * i.qty), 0);
             const rawDiscount = parseFloat(document.getElementById('cart-discount-input')?.value) || 0;
-            const discount = Math.max(0, Math.min(subtotal, rawDiscount));
-            const total = Math.max(0, subtotal - discount);
-            return { subtotal, discount, total };
+            const discountFils = Math.max(0, Math.min(subtotalFils, toFils(rawDiscount)));
+            const totalFils = Math.max(0, subtotalFils - discountFils);
+
+            return {
+                subtotalFils,
+                discountFils,
+                totalFils,
+                subtotal: fromFils(subtotalFils),
+                discount: fromFils(discountFils),
+                total: fromFils(totalFils)
+            };
         };
 
         window.onload = async () => {
-            // Register Service Worker for PWA / iOS / Android support
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
             }
@@ -579,13 +610,22 @@
                 return;
             }
             if (data) services = data;
-            renderServices();
+            filterServices();
         }
 
         async function fetchCustomers() {
             if (!supabaseClient) return;
             const { data } = await supabaseClient.from('contacts').select('*').order('name');
-            if (data) customers = data;
+            if (data) {
+                customers = data;
+                if (selectedCustomer) {
+                    const updatedSel = customers.find(c => c.id === selectedCustomer.id);
+                    if (updatedSel) {
+                        selectedCustomer = updatedSel;
+                        document.getElementById('disp-cust-balance').innerText = 'Due: ' + formatBHD(updatedSel.outstanding_balance);
+                    }
+                }
+            }
         }
 
         async function fetchOrders() {
@@ -601,37 +641,34 @@
         }
 
         function renderServices() {
+            filterServices();
+        }
+
+        function filterServices() {
+            const searchEl = document.getElementById('search-input');
+            const term = (searchEl ? searchEl.value : '').toLowerCase();
             const grid = document.getElementById('service-grid');
             grid.innerHTML = '';
+
             if (services.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500 text-xs col-span-full">No items found. Ensure database is populated via SQL Editor.</p>';
                 return;
             }
-            services.forEach(s => {
+
+            const filtered = services.filter(s =>
+                s.name.toLowerCase().includes(term) ||
+                s.category.toLowerCase().includes(term) ||
+                (s.sku || '').toLowerCase().includes(term)
+            );
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 text-xs col-span-full">No matching items found.</p>';
+                return;
+            }
+
+            filtered.forEach(s => {
                 const card = document.createElement('div');
                 card.className = 'bg-white p-3 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:border-teal-500 transition flex flex-col justify-between';
-                card.onclick = () => addToCart(s);
-                card.innerHTML = `
-                    <div>
-                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">${s.category}</span>
-                        <h4 class="font-bold text-xs text-gray-800 mt-1">${s.name}</h4>
-                    </div>
-                    <div class="mt-2 pt-1 border-t flex justify-between items-center text-xs">
-                        <span class="font-black text-teal-700">${formatBHD(s.retail_price)}</span>
-                        <span class="text-teal-600 font-bold">+ Add</span>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        function filterServices() {
-            const term = document.getElementById('search-input').value.toLowerCase();
-            const grid = document.getElementById('service-grid');
-            grid.innerHTML = '';
-            services.filter(s => s.name.toLowerCase().includes(term) || s.category.toLowerCase().includes(term)).forEach(s => {
-                const card = document.createElement('div');
-                card.className = 'bg-white p-3 rounded-lg border border-gray-200 cursor-pointer shadow-sm flex flex-col justify-between';
                 card.onclick = () => addToCart(s);
                 card.innerHTML = `
                     <div>
@@ -650,14 +687,24 @@
         function addToCart(service) {
             const existing = cart.find(i => i.id === service.id);
             if (existing) existing.qty += 1;
-            else cart.push({ id: service.id, name: service.name, price: service.retail_price, qty: 1 });
+            else cart.push({ id: service.id, name: service.name, price: fromFils(toFils(service.retail_price)), qty: 1 });
             updateCartUI();
         }
 
         function updateQty(id, delta) {
-            const item = cart.find(i => i.id === id);
-            if (!item) return;
-            item.qty = Math.max(1, item.qty + delta);
+            const idx = cart.findIndex(i => i.id === id);
+            if (idx === -1) return;
+            const nextQty = cart[idx].qty + delta;
+            if (nextQty <= 0) {
+                cart.splice(idx, 1);
+            } else {
+                cart[idx].qty = nextQty;
+            }
+            updateCartUI();
+        }
+
+        function removeCartItem(id) {
+            cart = cart.filter(i => i.id !== id);
             updateCartUI();
         }
 
@@ -680,23 +727,24 @@
             let totalPieces = 0;
 
             cart.forEach(item => {
-                const lineTotal = item.price * item.qty;
+                const lineTotalFils = toFils(item.price) * item.qty;
                 totalPieces += item.qty;
 
                 const div = document.createElement('div');
-                div.className = 'py-2 flex justify-between items-center text-xs';
+                div.className = 'py-2 flex justify-between items-center text-xs gap-2';
                 div.innerHTML = `
-                    <div>
-                        <p class="font-semibold text-gray-800">${item.name}</p>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-semibold text-gray-800 truncate">${item.name}</p>
                         <p class="text-gray-400 text-[10px]">${formatBHD(item.price)} per pc</p>
                     </div>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-1.5 shrink-0">
                         <div class="flex items-center border rounded">
-                            <button onclick="updateQty('${item.id}', -1)" class="px-2 bg-gray-100">-</button>
+                            <button onclick="updateQty('${item.id}', -1)" class="px-2 bg-gray-100 hover:bg-gray-200">-</button>
                             <span class="px-2 font-bold">${item.qty}</span>
-                            <button onclick="updateQty('${item.id}', 1)" class="px-2 bg-gray-100">+</button>
+                            <button onclick="updateQty('${item.id}', 1)" class="px-2 bg-gray-100 hover:bg-gray-200">+</button>
                         </div>
-                        <span class="font-bold w-14 text-right">${formatBHD(lineTotal)}</span>
+                        <span class="font-bold w-20 text-right">${formatBHD(fromFils(lineTotalFils))}</span>
+                        <button onclick="removeCartItem('${item.id}')" title="Remove item" class="text-red-500 hover:text-red-700 font-bold px-1">&times;</button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -756,7 +804,7 @@
                 let ordersHtml = custOrders.length > 0 ? custOrders.map(o => `
                     <tr>
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">#${o.ticket_number}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${new Date(o.created_at).toLocaleDateString()}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee;">${formatDateTimeBH(o.created_at)}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">${o.order_status}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatBHD(o.total_amount)}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; color: red; font-weight: bold;">${formatBHD(o.balance_due)}</td>
@@ -915,19 +963,32 @@
         async function confirmCheckoutOrder() {
             closeAdvanceModal();
             if (cart.length === 0) return alert('Ticket is empty');
-            const { subtotal, discount, total } = getCartTotals();
-            const advancePaid = parseFloat(document.getElementById('modal-advance-input').value) || 0;
-            const balanceDue = Math.max(0, total - advancePaid);
-            const custName = selectedCustomer.name;
-            const custPhone = selectedCustomer.phone;
-            const payStatus = advancePaid >= total ? 'PAID' : (advancePaid > 0 ? 'PARTIAL' : 'PENDING');
-            
+            if (!selectedCustomer) {
+                alert('Mandatory: Please select or register a customer before creating an order ticket.');
+                openCustomerModal();
+                return;
+            }
+
+            const { subtotalFils, discountFils, totalFils, subtotal, discount, total } = getCartTotals();
+            const rawAdvance = parseFloat(document.getElementById('modal-advance-input').value) || 0;
+            const advanceFils = Math.max(0, toFils(rawAdvance));
+            const balanceDueFils = Math.max(0, totalFils - advanceFils);
+
+            const advancePaid = fromFils(advanceFils);
+            const balanceDue = fromFils(balanceDueFils);
+
+            const custRef = selectedCustomer;
+            const custName = custRef.name;
+            const custPhone = custRef.phone;
+            const payStatus = advanceFils >= totalFils ? 'PAID' : (advanceFils > 0 ? 'PARTIAL' : 'PENDING');
             const paymentMethodSelected = document.querySelector('input[name="checkout_pay_method"]:checked')?.value || 'CASH';
 
             let newOrderId = null;
+            let createdTicketNumber = 'New';
+
             if (supabaseClient) {
                 const { data: orderData, error } = await supabaseClient.from('laundry_orders').insert([{
-                    customer_id: selectedCustomer.id,
+                    customer_id: custRef.id,
                     customer_name: custName,
                     customer_phone: custPhone,
                     subtotal: subtotal,
@@ -941,19 +1002,20 @@
 
                 if (error) return alert('Error creating ticket: ' + error.message);
                 newOrderId = orderData.id;
+                createdTicketNumber = orderData.ticket_number || 'New';
 
                 const itemsPayload = cart.map(i => ({
                     order_id: newOrderId,
                     product_id: i.id,
                     item_name: i.name,
-                    unit_price: i.price,
+                    unit_price: fromFils(toFils(i.price)),
                     quantity: i.qty,
                     picked_up_quantity: 0,
-                    total_price: i.price * i.qty
+                    total_price: fromFils(toFils(i.price) * i.qty)
                 }));
                 await supabaseClient.from('order_items').insert(itemsPayload);
 
-                if (advancePaid > 0) {
+                if (advanceFils > 0) {
                     await supabaseClient.from('order_payments').insert([{ 
                         order_id: newOrderId, 
                         amount_paid: advancePaid, 
@@ -961,29 +1023,37 @@
                     }]);
                 }
 
-                if (selectedCustomer) {
-                    const newOutstanding = (selectedCustomer.outstanding_balance || 0) + balanceDue;
-                    const newTotalSpent = (selectedCustomer.total_spent || 0) + total;
+                if (custRef) {
+                    const { data: freshCust } = await supabaseClient
+                        .from('contacts')
+                        .select('outstanding_balance, total_spent')
+                        .eq('id', custRef.id)
+                        .single();
+
+                    const baseOutstandingFils = freshCust ? toFils(freshCust.outstanding_balance) : toFils(custRef.outstanding_balance);
+                    const baseSpentFils = freshCust ? toFils(freshCust.total_spent) : toFils(custRef.total_spent);
+
+                    const newOutstanding = fromFils(baseOutstandingFils + balanceDueFils);
+                    const newTotalSpent = fromFils(baseSpentFils + totalFils);
+
                     await supabaseClient.from('contacts').update({
                         outstanding_balance: newOutstanding,
                         total_spent: newTotalSpent
-                    }).eq('id', selectedCustomer.id);
-                    selectedCustomer.outstanding_balance = newOutstanding;
-                    selectedCustomer.total_spent = newTotalSpent;
-                    await fetchCustomers();
+                    }).eq('id', custRef.id);
                 }
             }
 
             lastCreatedOrderId = newOrderId;
-            const createdOrder = activeOrders.find(o => o.id === newOrderId) || { ticket_number: 'New', customer_name: custName };
-            
-            // Open Action Modal instead of direct auto-print
-            document.getElementById('receipt-action-subtitle').innerText = `Ticket #${createdOrder.ticket_number || 'New'} created for ${custName} (${custPhone}).`;
-            document.getElementById('receipt-action-modal').classList.remove('hidden');
-
             clearCart();
             await fetchOrders();
             await fetchPayments();
+            await fetchCustomers();
+
+            const fetchedOrder = activeOrders.find(o => o.id === newOrderId);
+            const displayTicketNo = (fetchedOrder && fetchedOrder.ticket_number) || createdTicketNumber;
+
+            document.getElementById('receipt-action-subtitle').innerText = `Ticket #${displayTicketNo} created for ${custName} (${custPhone}).`;
+            document.getElementById('receipt-action-modal').classList.remove('hidden');
         }
 
         function closeReceiptActionModal() {
@@ -1017,10 +1087,13 @@
             }
 
             const custNoFormatted = getOrderCustomerNumber(order);
-            const subtotalVal = order.subtotal !== undefined && order.subtotal !== null
-                ? order.subtotal
-                : ((order.total_amount || 0) + (order.discount_amount || 0));
-            const discountVal = order.discount_amount || 0;
+            const orderPayments = orderPaymentsList.filter(p => p.order_id === order.id);
+            const methodsUsed = [...new Set(orderPayments.map(p => p.payment_method).filter(Boolean))].join(', ');
+
+            const subtotalFils = (order.subtotal !== undefined && order.subtotal !== null)
+                ? toFils(order.subtotal)
+                : (toFils(order.total_amount) + toFils(order.discount_amount));
+            const discountFils = toFils(order.discount_amount);
 
             const itemsText = (order.order_items || []).map(i => 
                 `• ${i.quantity}x ${i.item_name}\n   Unit: ${formatBHD(i.unit_price)} | Total: ${formatBHD(i.total_price)}`
@@ -1029,15 +1102,15 @@
             const message = `*SPOTLESS SPIN LAUNDRY W.L.L.*\n` +
                 `_Your Clothes Deserve A Better Spin_\n\n` +
                 `*TICKET #${order.ticket_number}*\n` +
-                `Date: ${new Date(order.created_at).toLocaleString()}\n` +
+                `Date: ${formatDateTimeBH(order.created_at)}\n` +
                 `Customer: ${order.customer_name}\n` +
                 `Customer No.: #${custNoFormatted}\n` +
                 `Mobile: ${order.customer_phone}\n\n` +
                 `*ITEMIZED DETAILS:*\n${itemsText}\n\n` +
-                `*Subtotal:* ${formatBHD(subtotalVal)}\n` +
-                (discountVal > 0 ? `*Discount:* -${formatBHD(discountVal)}\n` : '') +
+                `*Subtotal:* ${formatBHD(fromFils(subtotalFils))}\n` +
+                (discountFils > 0 ? `*Discount:* -${formatBHD(fromFils(discountFils))}\n` : '') +
                 `*Total Amount:* ${formatBHD(order.total_amount)}\n` +
-                `*Paid Advance:* ${formatBHD(order.paid_amount)}\n` +
+                `*Paid Advance:* ${formatBHD(order.paid_amount)}${methodsUsed ? ` (${methodsUsed})` : ''}\n` +
                 `*Balance Due:* ${formatBHD(order.balance_due)}\n` +
                 `━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━ ━\n` +
                 ` WhatsApp: 33205757\n` +
@@ -1109,7 +1182,7 @@
                     document.getElementById('edit-prod-sku').value = s.sku;
                     document.getElementById('edit-prod-name').value = s.name;
                     document.getElementById('edit-prod-category').value = s.category;
-                    document.getElementById('edit-prod-price').value = s.retail_price.toFixed(3);
+                    document.getElementById('edit-prod-price').value = fromFils(toFils(s.retail_price)).toFixed(3);
                 }
             }
         }
@@ -1123,9 +1196,10 @@
             const sku = document.getElementById('edit-prod-sku').value.trim();
             const name = document.getElementById('edit-prod-name').value.trim();
             const category = document.getElementById('edit-prod-category').value.trim() || 'Garments';
-            const retail_price = parseFloat(document.getElementById('edit-prod-price').value);
+            const parsedPrice = parseFloat(document.getElementById('edit-prod-price').value);
+            const retail_price = fromFils(toFils(parsedPrice));
 
-            if (!sku || !name || isNaN(retail_price) || retail_price < 0) {
+            if (!sku || !name || isNaN(parsedPrice) || parsedPrice < 0) {
                 return alert('Please enter valid SKU, Name, and Price.');
             }
 
@@ -1165,19 +1239,19 @@
             document.getElementById('sales-modal').classList.add('hidden');
         }
         function renderSalesSummary() {
-            let totalRevenue = 0;
-            let totalCollected = 0;
-            let totalDue = 0;
+            let totalRevenueFils = 0;
+            let totalCollectedFils = 0;
+            let totalDueFils = 0;
 
             activeOrders.forEach(o => {
-                totalRevenue += (o.total_amount || 0);
-                totalCollected += (o.paid_amount || 0);
-                totalDue += (o.balance_due || 0);
+                totalRevenueFils += toFils(o.total_amount);
+                totalCollectedFils += toFils(o.paid_amount);
+                totalDueFils += toFils(o.balance_due);
             });
 
-            document.getElementById('sales-total-revenue').innerText = formatBHD(totalRevenue);
-            document.getElementById('sales-total-collected').innerText = formatBHD(totalCollected);
-            document.getElementById('sales-total-due').innerText = formatBHD(totalDue);
+            document.getElementById('sales-total-revenue').innerText = formatBHD(fromFils(totalRevenueFils));
+            document.getElementById('sales-total-collected').innerText = formatBHD(fromFils(totalCollectedFils));
+            document.getElementById('sales-total-due').innerText = formatBHD(fromFils(totalDueFils));
 
             const container = document.getElementById('sales-list-container');
             container.innerHTML = '';
@@ -1187,7 +1261,7 @@
                 div.innerHTML = `
                     <div>
                         <strong>Ticket #${o.ticket_number}</strong> - ${o.customer_name} (${o.customer_phone})<br>
-                        <span class="text-gray-400 text-[10px]">${new Date(o.created_at).toLocaleString()} | Status: ${o.order_status}</span>
+                        <span class="text-gray-400 text-[10px]">${formatDateTimeBH(o.created_at)} | Status: ${o.order_status}</span>
                     </div>
                     <div class="flex items-center space-x-3">
                         <div class="text-right">
@@ -1230,12 +1304,13 @@
         function setAdminDatePreset(preset) {
             const now = new Date();
             let fromStr = '';
-            let toStr = now.toISOString().split('T')[0];
+            let toStr = formatDateBH(now);
 
             if (preset === 'today') {
                 fromStr = toStr;
             } else if (preset === 'month') {
-                fromStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const parts = toStr.split('-');
+                fromStr = `${parts[0]}-${parts[1]}-01`;
             } else if (preset === 'all') {
                 fromStr = '';
                 toStr = '';
@@ -1258,41 +1333,39 @@
             let filteredPayments = orderPaymentsList;
 
             if (fromVal) {
-                const fromDate = new Date(fromVal);
-                fromDate.setHours(0,0,0,0);
+                const fromDate = new Date(fromVal + 'T00:00:00+03:00');
                 filteredOrders = filteredOrders.filter(o => new Date(o.created_at) >= fromDate);
                 filteredPayments = filteredPayments.filter(p => new Date(p.created_at) >= fromDate);
             }
             if (toVal) {
-                const toDate = new Date(toVal);
-                toDate.setHours(23,59,59,999);
+                const toDate = new Date(toVal + 'T23:59:59.999+03:00');
                 filteredOrders = filteredOrders.filter(o => new Date(o.created_at) <= toDate);
                 filteredPayments = filteredPayments.filter(p => new Date(p.created_at) <= toDate);
             }
 
             // KPIs
-            let totalRev = 0;
-            let totalColl = 0;
-            let totalDue = 0;
+            let totalRevFils = 0;
+            let totalCollFils = 0;
+            let totalDueFils = 0;
             filteredOrders.forEach(o => {
-                totalRev += (o.total_amount || 0);
-                totalColl += (o.paid_amount || 0);
-                totalDue += (o.balance_due || 0);
+                totalRevFils += toFils(o.total_amount);
+                totalCollFils += toFils(o.paid_amount);
+                totalDueFils += toFils(o.balance_due);
             });
 
-            document.getElementById('admin-kpi-revenue').innerText = formatBHD(totalRev);
-            document.getElementById('admin-kpi-collected').innerText = formatBHD(totalColl);
-            document.getElementById('admin-kpi-due').innerText = formatBHD(totalDue);
+            document.getElementById('admin-kpi-revenue').innerText = formatBHD(fromFils(totalRevFils));
+            document.getElementById('admin-kpi-collected').innerText = formatBHD(fromFils(totalCollFils));
+            document.getElementById('admin-kpi-due').innerText = formatBHD(fromFils(totalDueFils));
             document.getElementById('admin-kpi-tickets').innerText = filteredOrders.length;
 
             // 1. Daily Revenue Trend Chart Data
             const dailyMap = {};
             filteredOrders.forEach(o => {
-                const dayStr = new Date(o.created_at).toISOString().split('T')[0];
-                dailyMap[dayStr] = (dailyMap[dayStr] || 0) + (o.total_amount || 0);
+                const dayStr = formatDateBH(o.created_at);
+                dailyMap[dayStr] = (dailyMap[dayStr] || 0) + toFils(o.total_amount);
             });
             const sortedDays = Object.keys(dailyMap).sort();
-            const revenueData = sortedDays.map(d => dailyMap[d]);
+            const revenueData = sortedDays.map(d => fromFils(dailyMap[d]));
 
             if (chartRevenueTrendInstance) chartRevenueTrendInstance.destroy();
             const ctxRev = document.getElementById('chart-revenue-trend').getContext('2d');
@@ -1316,7 +1389,7 @@
             const methodMap = { CASH: 0, CARD: 0, BENEFIT_PAY: 0 };
             filteredPayments.forEach(p => {
                 const m = p.payment_method || 'CASH';
-                methodMap[m] = (methodMap[m] || 0) + (p.amount_paid || 0);
+                methodMap[m] = (methodMap[m] || 0) + toFils(p.amount_paid);
             });
 
             if (chartPaymentMethodsInstance) chartPaymentMethodsInstance.destroy();
@@ -1326,7 +1399,7 @@
                 data: {
                     labels: ['Cash', 'Card', 'BenefitPay'],
                     datasets: [{
-                        data: [methodMap['CASH'], methodMap['CARD'], methodMap['BENEFIT_PAY']],
+                        data: [fromFils(methodMap['CASH']), fromFils(methodMap['CARD']), fromFils(methodMap['BENEFIT_PAY'])],
                         backgroundColor: ['#0d9488', '#3b82f6', '#f59e0b']
                     }]
                 },
@@ -1414,7 +1487,7 @@
                 const div = document.createElement('div');
                 div.className = 'py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2';
                 
-                let itemsSummary = (o.order_items || []).map(i => `${i.quantity - i.picked_up_quantity} / ${i.quantity} ${i.item_name} pending`).join('<br>');
+                let itemsSummary = (o.order_items || []).map(i => `${Math.max(0, i.quantity - i.picked_up_quantity)} / ${i.quantity} ${i.item_name} pending`).join('<br>');
 
                 div.innerHTML = `
                     <div>
@@ -1440,45 +1513,63 @@
             currentPickupOrder = activeOrders.find(o => o.id === orderId);
             if (!currentPickupOrder) return;
             document.getElementById('pickup-order-id').value = orderId;
-            document.getElementById('pickup-payment-add').value = currentPickupOrder.balance_due.toFixed(3);
+            document.getElementById('pickup-payment-add').value = fromFils(toFils(currentPickupOrder.balance_due)).toFixed(3);
 
             const container = document.getElementById('pickup-items-list');
             container.innerHTML = '';
             (currentPickupOrder.order_items || []).forEach((item, idx) => {
-                const remaining = item.quantity - item.picked_up_quantity;
+                const remaining = Math.max(0, item.quantity - item.picked_up_quantity);
                 const row = document.createElement('div');
-                row.className = 'py-1.5 flex justify-between items-center';
+                row.className = 'py-1.5 flex justify-between items-center gap-2';
                 row.innerHTML = `
                     <span>${item.item_name} (Total: ${item.quantity}, Already Taken: ${item.picked_up_quantity})</span>
-                    <div class="flex items-center space-x-1">
+                    <div class="flex items-center space-x-1 shrink-0">
                         <span class="text-xs">Take Now:</span>
-                        <input type="number" id="pickup-qty-${idx}" min="0" max="${remaining}" value="0" class="w-16 border rounded p-1 text-center font-bold">
+                        <input type="number" id="pickup-qty-${idx}" min="0" max="${remaining}" value="0" onchange="clampPickupInput(${idx}, ${remaining})" class="w-16 border rounded p-1 text-center font-bold">
                     </div>
                 `;
                 container.appendChild(row);
             });
             document.getElementById('pickup-modal').classList.remove('hidden');
         }
+
+        function clampPickupInput(idx, maxVal) {
+            const input = document.getElementById(`pickup-qty-${idx}`);
+            if (!input) return;
+            let val = parseInt(input.value, 10);
+            if (isNaN(val) || val < 0) val = 0;
+            if (val > maxVal) val = maxVal;
+            input.value = val;
+        }
+
         function closePickupModal() { document.getElementById('pickup-modal').classList.add('hidden'); }
 
         async function confirmPartialPickup() {
+            if (!currentPickupOrder) return;
             const orderId = document.getElementById('pickup-order-id').value;
-            const additionalPayment = parseFloat(document.getElementById('pickup-payment-add').value) || 0;
+            const rawAddPayment = parseFloat(document.getElementById('pickup-payment-add').value) || 0;
+            const additionalPaymentFils = Math.max(0, toFils(rawAddPayment));
+            const additionalPayment = fromFils(additionalPaymentFils);
             const pickupPaymentMethod = document.querySelector('input[name="pickup_pay_method"]:checked')?.value || 'CASH';
             
             let allItemsPickedUp = true;
-            let updatedItems = [...currentPickupOrder.order_items];
-
-            updatedItems.forEach((item, idx) => {
-                const takeQty = parseInt(document.getElementById(`pickup-qty-${idx}`).value) || 0;
-                item.picked_up_quantity = Math.min(item.quantity, item.picked_up_quantity + takeQty);
-                if (item.picked_up_quantity < item.quantity) allItemsPickedUp = false;
+            let updatedItems = (currentPickupOrder.order_items || []).map((item, idx) => {
+                const remaining = Math.max(0, item.quantity - item.picked_up_quantity);
+                let takeQty = parseInt(document.getElementById(`pickup-qty-${idx}`).value, 10) || 0;
+                takeQty = Math.max(0, Math.min(remaining, takeQty));
+                const nextPickedUp = Math.min(item.quantity, item.picked_up_quantity + takeQty);
+                if (nextPickedUp < item.quantity) allItemsPickedUp = false;
+                return { ...item, picked_up_quantity: nextPickedUp };
             });
 
-            const newPaid = currentPickupOrder.paid_amount + additionalPayment;
-            const newBalanceDue = Math.max(0, currentPickupOrder.total_amount - newPaid);
+            const totalFils = toFils(currentPickupOrder.total_amount);
+            const newPaidFils = toFils(currentPickupOrder.paid_amount) + additionalPaymentFils;
+            const newBalanceDueFils = Math.max(0, totalFils - newPaidFils);
+
+            const newPaid = fromFils(newPaidFils);
+            const newBalanceDue = fromFils(newBalanceDueFils);
             const newOrderStatus = allItemsPickedUp ? 'COMPLETED' : 'PARTIALLY_PICKED';
-            const newPayStatus = newBalanceDue === 0 ? 'PAID' : (newPaid > 0 ? 'PARTIAL' : 'PENDING');
+            const newPayStatus = newBalanceDueFils === 0 ? 'PAID' : (newPaidFils > 0 ? 'PARTIAL' : 'PENDING');
 
             if (supabaseClient) {
                 for (let item of updatedItems) {
@@ -1491,7 +1582,7 @@
                     payment_status: newPayStatus
                 }).eq('id', orderId);
 
-                if (additionalPayment > 0) {
+                if (additionalPaymentFils > 0) {
                     await supabaseClient.from('order_payments').insert([{ 
                         order_id: orderId, 
                         amount_paid: additionalPayment, 
@@ -1499,16 +1590,21 @@
                     }]);
                 }
 
-                if (currentPickupOrder.customer_id && additionalPayment > 0) {
-                    const cust = customers.find(c => c.id === currentPickupOrder.customer_id);
-                    if (cust) {
-                        const newOutstanding = Math.max(0, (cust.outstanding_balance || 0) - additionalPayment);
-                        await supabaseClient.from('contacts').update({
-                            outstanding_balance: newOutstanding
-                        }).eq('id', cust.id);
-                        cust.outstanding_balance = newOutstanding;
-                        await fetchCustomers();
-                    }
+                if (currentPickupOrder.customer_id && additionalPaymentFils > 0) {
+                    const { data: freshCust } = await supabaseClient
+                        .from('contacts')
+                        .select('outstanding_balance')
+                        .eq('id', currentPickupOrder.customer_id)
+                        .single();
+
+                    const currentDueFils = freshCust
+                        ? toFils(freshCust.outstanding_balance)
+                        : toFils((customers.find(c => c.id === currentPickupOrder.customer_id) || {}).outstanding_balance);
+
+                    const newOutstanding = fromFils(Math.max(0, currentDueFils - additionalPaymentFils));
+                    await supabaseClient.from('contacts').update({
+                        outstanding_balance: newOutstanding
+                    }).eq('id', currentPickupOrder.customer_id);
                 }
             }
 
@@ -1516,6 +1612,7 @@
             closePickupModal();
             await fetchOrders();
             await fetchPayments();
+            await fetchCustomers();
             openOrdersModal();
         }
 
@@ -1524,10 +1621,13 @@
             if (!order) return;
 
             const custNoFormatted = getOrderCustomerNumber(order);
-            const subtotalVal = order.subtotal !== undefined && order.subtotal !== null
-                ? order.subtotal
-                : ((order.total_amount || 0) + (order.discount_amount || 0));
-            const discountVal = order.discount_amount || 0;
+            const orderPayments = orderPaymentsList.filter(p => p.order_id === order.id);
+            const methodsUsed = [...new Set(orderPayments.map(p => p.payment_method).filter(Boolean))].join(', ');
+
+            const subtotalFils = (order.subtotal !== undefined && order.subtotal !== null)
+                ? toFils(order.subtotal)
+                : (toFils(order.total_amount) + toFils(order.discount_amount));
+            const discountFils = toFils(order.discount_amount);
 
             const printContainer = document.getElementById('print-container');
             printContainer.innerHTML = `
@@ -1543,7 +1643,7 @@
                     <div><strong>Customer:</strong> ${order.customer_name}</div>
                     <div><strong>Customer No.:</strong> #${custNoFormatted}</div>
                     <div><strong>Mobile:</strong> ${order.customer_phone}</div>
-                    <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+                    <div><strong>Date:</strong> ${formatDateTimeBH(order.created_at)}</div>
                 </div>
                 <hr style="border: dashed 1px black; margin: 4px 0;">
                 <table style="width:100%; font-size: 9px; font-family: monospace;">
@@ -1554,18 +1654,19 @@
                     </tr>
                     ${(order.order_items || []).map(i => `
                         <tr>
-                            <td>${i.item_name}</td>
-                            <td style="text-align:center;">${i.quantity}</td>
-                            <td style="text-align:right;">${formatBHD(i.total_price)}</td>
+                            <td style="word-break: break-word; padding-right: 4px;">${i.item_name}</td>
+                            <td style="text-align:center; vertical-align: top;">${i.quantity}</td>
+                            <td style="text-align:right; vertical-align: top;">${formatBHD(i.total_price)}</td>
                         </tr>
                     `).join('')}
                 </table>
                 <hr style="border: dashed 1px black; margin: 4px 0;">
                 <div style="font-size: 9px; font-family: monospace; display:flex; flex-direction:column; gap:2px;">
-                    <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span><span>${formatBHD(subtotalVal)}</span></div>
-                    ${discountVal > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Discount:</span><span>-${formatBHD(discountVal)}</span></div>` : ''}
+                    <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span><span>${formatBHD(fromFils(subtotalFils))}</span></div>
+                    ${discountFils > 0 ? `<div style="display:flex; justify-content:space-between;"><span>Discount:</span><span>-${formatBHD(fromFils(discountFils))}</span></div>` : ''}
                     <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Total Amount:</span><span>${formatBHD(order.total_amount)}</span></div>
                     <div style="display:flex; justify-content:space-between;"><span>Paid Advance:</span><span>${formatBHD(order.paid_amount)}</span></div>
+                    ${methodsUsed ? `<div style="display:flex; justify-content:space-between;"><span>Method:</span><span>${methodsUsed}</span></div>` : ''}
                     <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>Balance Due:</span><span>${formatBHD(order.balance_due)}</span></div>
                 </div>
                 <hr style="border: dashed 1px black; margin: 4px 0;">
