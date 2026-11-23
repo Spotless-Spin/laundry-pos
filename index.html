@@ -58,16 +58,16 @@
     <!-- Main Workspace (POS Dashboard View) -->
     <div id="pos-view" class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
-        <!-- Left: Service Catalog (expands to fill remaining desktop space) -->
-        <div id="mobile-catalog-panel" class="w-full md:flex-1 p-4 flex flex-col flex-1 md:h-full overflow-hidden">
+        <!-- Left: Service Catalog (65% width on desktop, 4 items per row) -->
+        <div id="mobile-catalog-panel" class="w-full md:w-[65%] p-4 flex flex-col flex-1 md:h-full overflow-hidden">
             <div class="mb-3">
                 <input type="text" id="search-input" onkeyup="filterServices()" placeholder="Search laundry items (e.g. Thobe, Abaya, Blanket)..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white">
             </div>
-            <div id="service-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto no-scrollbar pb-16"></div>
+            <div id="service-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto no-scrollbar pb-16"></div>
         </div>
 
-        <!-- Right: Current Ticket Cart (compact fixed width on desktop) -->
-        <div id="mobile-cart-panel" class="hidden md:flex w-full md:w-80 lg:w-96 md:shrink-0 bg-white border-l border-gray-200 flex-col flex-1 md:h-full shadow-lg overflow-hidden">
+        <!-- Right: Current Ticket Cart (35% width on desktop) -->
+        <div id="mobile-cart-panel" class="hidden md:flex w-full md:w-[35%] bg-white border-l border-gray-200 flex-col flex-1 md:h-full shadow-lg overflow-hidden">
             <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0">
                 <h2 class="font-bold text-gray-700 text-sm">New Ticket</h2>
                 <button onclick="clearCart()" class="text-xs text-red-600 font-medium">Clear All</button>
