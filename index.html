@@ -59,7 +59,7 @@
     <div id="pos-view" class="flex-1 flex flex-col md:flex-row overflow-hidden">
         
         <!-- Left: Service Catalog -->
-        <div class="w-full md:w-3/5 p-4 flex flex-col h-full overflow-hidden">
+        <div id="mobile-catalog-panel" class="w-full md:w-3/5 p-4 flex flex-col flex-1 md:h-full overflow-hidden">
             <div class="mb-3">
                 <input type="text" id="search-input" onkeyup="filterServices()" placeholder="Search laundry items (e.g. Thobe, Abaya, Blanket)..." class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white">
             </div>
@@ -67,14 +67,14 @@
         </div>
 
         <!-- Right: Current Ticket Cart -->
-        <div class="w-full md:w-2/5 bg-white border-l border-gray-200 flex flex-col h-full shadow-lg">
-            <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
+        <div id="mobile-cart-panel" class="hidden md:flex w-full md:w-2/5 bg-white border-l border-gray-200 flex-col flex-1 md:h-full shadow-lg overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b flex justify-between items-center shrink-0">
                 <h2 class="font-bold text-gray-700 text-sm">New Ticket</h2>
                 <button onclick="clearCart()" class="text-xs text-red-600 font-medium">Clear All</button>
             </div>
 
             <!-- Customer Picker Box -->
-            <div class="p-3 bg-teal-50 border-b space-y-2">
+            <div class="p-3 bg-teal-50 border-b space-y-2 shrink-0">
                 <div class="flex justify-between items-center">
                     <label class="text-[10px] font-bold text-teal-800 uppercase">Customer (Mandatory)</label>
                     <button onclick="openCustomerModal()" class="text-xs text-teal-700 font-bold hover:underline">Select / New</button>
@@ -92,7 +92,7 @@
             <div id="cart-items" class="flex-1 overflow-y-auto p-3 space-y-2 divide-y divide-gray-100"></div>
 
             <!-- Summary & Payment Footer -->
-            <div class="p-3 bg-gray-50 border-t space-y-2">
+            <div class="p-3 bg-gray-50 border-t space-y-2 shrink-0">
                 <div class="flex justify-between text-xs text-gray-600">
                     <span>Total Pieces:</span>
                     <span id="summary-pieces" class="font-bold">0 pcs</span>
@@ -119,6 +119,19 @@
                 </button>
             </div>
         </div>
+
+        <!-- Mobile Bottom Switcher: Catalog vs Cart -->
+        <nav id="mobile-bottom-nav" class="md:hidden bg-white border-t border-gray-200 grid grid-cols-2 shrink-0 z-30 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
+            <button id="mobile-tab-catalog" type="button" onclick="switchMobilePosTab('catalog')" class="py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-teal-600 text-teal-700 bg-teal-50/60 transition">
+                <span>🧺</span>
+                <span>Catalog</span>
+            </button>
+            <button id="mobile-tab-cart" type="button" onclick="switchMobilePosTab('cart')" class="py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-transparent text-gray-600 bg-white transition">
+                <span>🛒</span>
+                <span>Cart</span>
+                <span id="mobile-cart-badge" class="bg-teal-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">0</span>
+            </button>
+        </nav>
     </div>
 
     <!-- CUSTOMER LEDGER VIEW (IN-TAB) -->
@@ -472,6 +485,7 @@
         let selectedCustomer = null;
         let cart = [];
         let lastCreatedOrderId = null;
+        let activeMobilePosTab = 'catalog';
 
         // Chart instances
         let chartRevenueTrendInstance = null;
@@ -538,12 +552,42 @@
             };
         };
 
+        function switchMobilePosTab(tab) {
+            activeMobilePosTab = tab === 'cart' ? 'cart' : 'catalog';
+            const catalogPanel = document.getElementById('mobile-catalog-panel');
+            const cartPanel = document.getElementById('mobile-cart-panel');
+            const catalogTabBtn = document.getElementById('mobile-tab-catalog');
+            const cartTabBtn = document.getElementById('mobile-tab-cart');
+
+            if (!catalogPanel || !cartPanel || !catalogTabBtn || !cartTabBtn) return;
+
+            if (activeMobilePosTab === 'cart') {
+                catalogPanel.classList.add('hidden');
+                catalogPanel.classList.remove('flex');
+                cartPanel.classList.remove('hidden');
+                cartPanel.classList.add('flex');
+
+                cartTabBtn.className = 'py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-teal-600 text-teal-700 bg-teal-50/60 transition';
+                catalogTabBtn.className = 'py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-transparent text-gray-600 bg-white transition';
+            } else {
+                cartPanel.classList.add('hidden');
+                cartPanel.classList.remove('flex');
+                catalogPanel.classList.remove('hidden');
+                catalogPanel.classList.add('flex');
+
+                catalogTabBtn.className = 'py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-teal-600 text-teal-700 bg-teal-50/60 transition';
+                cartTabBtn.className = 'py-3 px-2 text-xs font-bold flex items-center justify-center space-x-1.5 border-t-2 border-transparent text-gray-600 bg-white transition';
+            }
+        }
+
         window.onload = async () => {
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('./sw.js').then((reg) => {
                     reg.update();
                 }).catch(err => console.log('SW registration failed:', err));
             }
+
+            switchMobilePosTab('catalog');
 
             await fetchUsers();
             await fetchServices();
@@ -589,6 +633,7 @@
             document.getElementById('customer-ledger-view').classList.add('hidden');
             document.getElementById('admin-dashboard-view').classList.add('hidden');
             document.getElementById('pos-view').classList.remove('hidden');
+            switchMobilePosTab('catalog');
         }
 
         function applyUserPrivileges() {
@@ -758,6 +803,9 @@
             document.getElementById('summary-subtotal').innerText = formatBHD(subtotal);
             document.getElementById('summary-discount').innerText = '- ' + formatBHD(discount);
             document.getElementById('summary-total').innerText = formatBHD(total);
+
+            const mobileBadge = document.getElementById('mobile-cart-badge');
+            if (mobileBadge) mobileBadge.innerText = String(totalPieces);
         }
 
         async function openCustomerModal() { 
@@ -779,6 +827,7 @@
         function closeCustomerLedgerView() {
             document.getElementById('customer-ledger-view').classList.add('hidden');
             document.getElementById('pos-view').classList.remove('hidden');
+            switchMobilePosTab(activeMobilePosTab);
         }
 
         async function renderCustomerLedgerView() {
@@ -1047,6 +1096,7 @@
 
             lastCreatedOrderId = newOrderId;
             clearCart();
+            switchMobilePosTab('catalog');
             await fetchOrders();
             await fetchPayments();
             await fetchCustomers();
@@ -1295,6 +1345,7 @@
         function closeAdminDashboard() {
             document.getElementById('admin-dashboard-view').classList.add('hidden');
             document.getElementById('pos-view').classList.remove('hidden');
+            switchMobilePosTab(activeMobilePosTab);
         }
 
         function resetAdminDateFilter() {
